@@ -11,6 +11,7 @@ import java.util.Set;
 import org.jibble.pircbot.DccChat;
 import org.jibble.pircbot.DccFileTransfer;
 import org.jibble.pircbot.PircBot;
+import org.jibble.pircbot.User;
 
 /**
  * Performs actions on IRC channels. SmartBot adds several features to the
@@ -84,20 +85,6 @@ public class SmartBot extends PircBot {
 			}
 		}
 		loadedModules.put(null, this.modules.get(null));
-	}
-	
-	@Override
-	protected void onAction(String sender, String login, String hostname, String target, String action) {
-		for (BotModule m : loadedModules.values()) {
-			m.onAction(sender, login, hostname, target, action);
-		}
-	}
-	
-	@Override
-	protected void onChannelInfo(String channel, int userCount, String topic) {
-		for (BotModule m : loadedModules.values()) {
-			m.onChannelInfo(channel, userCount, topic);
-		}
 	}
 	
 	/**
@@ -732,192 +719,6 @@ public class SmartBot extends PircBot {
 		return module;
 	}
 	
-	@Override
-	protected void onIncomingChatRequest(DccChat chat) {
-		for (BotModule m : loadedModules.values()) {
-			m.onIncomingChatRequest(chat);
-		}
-	}
-	
-	@Override
-	protected void onIncomingFileTransfer(DccFileTransfer transfer) {
-		for (BotModule m : loadedModules.values()) {
-			m.onIncomingFileTransfer(transfer);
-		}
-	}
-	
-	@Override
-	protected void onInvite(String targetNick, String sourceNick, String sourceLogin, String sourceHostname, String channel) {
-		for (BotModule m : loadedModules.values()) {
-			m.onInvite(targetNick, sourceNick, sourceLogin, sourceHostname, channel);
-		}
-	}
-	
-	@Override
-	protected void onJoin(String channel, String sender, String login, String hostname) {
-		for (BotModule m : loadedModules.values()) {
-			m.onJoin(channel, sender, login, hostname);
-		}
-	}
-	
-	@Override
-	protected void onMode(String channel, String sourceNick, String sourceLogin, String sourceHostname, String mode) {
-		for (BotModule m : loadedModules.values()) {
-			m.onMode(channel, sourceNick, sourceLogin, sourceHostname, mode);
-		}
-	}
-	
-	@Override
-	protected void onNickChange(String oldNick, String login, String hostname, String newNick) {
-		for (BotModule m : loadedModules.values()) {
-			m.onNickChange(oldNick, login, hostname, newNick);
-		}
-	}
-	
-	@Override
-	protected void onNotice(String sourceNick, String sourceLogin, String sourceHostname, String target, String notice) {
-		for (BotModule m : loadedModules.values()) {
-			m.onNotice(sourceNick, sourceLogin, sourceHostname, target, notice);
-		}
-	}
-	
-	@Override
-	protected void onOp(String channel, String sourceNick, String sourceLogin, String sourceHostname, String recipient) {
-		for (BotModule m : loadedModules.values()) {
-			m.onOp(channel, sourceNick, sourceLogin, sourceHostname, recipient);
-		}
-	}
-	
-	@Override
-	protected void onPart(String channel, String sender, String login, String hostname) {
-		for (BotModule m : loadedModules.values()) {
-			m.onPart(channel, sender, login, hostname);
-		}
-	}
-	
-	@Override
-	protected void onPing(String sourceNick, String sourceLogin, String sourceHostname, String target, String pingValue) {
-		for (BotModule m : loadedModules.values()) {
-			m.onPing(sourceNick, sourceLogin, sourceHostname, target, pingValue);
-		}
-		super.onPing(sourceNick, sourceLogin, sourceHostname, target, pingValue);
-	}
-	
-	@Override
-	protected void onQuit(String sourceNick, String sourceLogin, String sourceHostname, String reason) {
-		for (BotModule m : loadedModules.values()) {
-			m.onQuit(sourceNick, sourceLogin, sourceHostname, reason);
-		}
-	}
-	
-	@Override
-	protected void onRemoveChannelBan(String channel, String sourceNick, String sourceLogin, String sourceHostname, String hostmask) {
-		for (BotModule m : loadedModules.values()) {
-			m.onRemoveChannelBan(channel, sourceNick, sourceLogin, sourceHostname, hostmask);
-		}
-	}
-	
-	@Override
-	protected void onRemoveChannelKey(String channel, String sourceNick, String sourceLogin, String sourceHostname, String key) {
-		for (BotModule m : loadedModules.values()) {
-			m.onRemoveChannelKey(channel, sourceNick, sourceLogin, sourceHostname, key);
-		}
-	}
-	
-	@Override
-	protected void onRemoveChannelLimit(String channel, String sourceNick, String sourceLogin, String sourceHostname) {
-		for (BotModule m : loadedModules.values()) {
-			m.onRemoveChannelLimit(channel, sourceNick, sourceLogin, sourceHostname);
-		}
-	}
-	
-	@Override
-	protected void onRemoveInviteOnly(String channel, String sourceNick, String sourceLogin, String sourceHostname) {
-		for (BotModule m : loadedModules.values()) {
-			m.onRemoveInviteOnly(channel, sourceNick, sourceLogin, sourceHostname);
-		}
-	}
-	
-	@Override
-	protected void onRemoveModerated(String channel, String sourceNick, String sourceLogin, String sourceHostname) {
-		for (BotModule m : loadedModules.values()) {
-			m.onRemoveModerated(channel, sourceNick, sourceLogin, sourceHostname);
-		}
-	}
-	
-	@Override
-	protected void onRemoveNoExternalMessages(String channel, String sourceNick, String sourceLogin, String sourceHostname) {
-		for (BotModule m : loadedModules.values()) {
-			m.onRemoveNoExternalMessages(channel, sourceNick, sourceLogin, sourceHostname);
-		}
-	}
-	
-	@Override
-	protected void onRemovePrivate(String channel, String sourceNick, String sourceLogin, String sourceHostname) {
-		for (BotModule m : loadedModules.values()) {
-			m.onRemovePrivate(channel, sourceNick, sourceLogin, sourceHostname);
-		}
-	}
-	
-	@Override
-	protected void onRemoveSecret(String channel, String sourceNick, String sourceLogin, String sourceHostname) {
-		for (BotModule m : loadedModules.values()) {
-			m.onRemoveSecret(channel, sourceNick, sourceLogin, sourceHostname);
-		}
-	}
-	
-	@Override
-	protected void onRemoveTopicProtection(String channel, String sourceNick, String sourceLogin, String sourceHostname) {
-		for (BotModule m : loadedModules.values()) {
-			m.onRemoveTopicProtection(channel, sourceNick, sourceLogin, sourceHostname);
-		}
-	}
-	
-	@Override
-	protected void onServerPing(String response) {
-		for (BotModule m : loadedModules.values()) {
-			m.onServerPing(response);
-		}
-		super.onServerPing(response);
-	}
-	
-	@Override
-	protected void onJoin(String channel, String sender, String login, String hostname)  {
-		for (BotModule m : loadedModules.values()) {
-			m.onJoin(channel, sender, login, hostname);
-		}
-	}
-	
-	@Override
-	protected void onJoin(String channel, String sender, String login, String hostname)  {
-		for (BotModule m : loadedModules.values()) {
-			m.onJoin(channel, sender, login, hostname);
-		}
-	}
-	
-	@Override
-	protected void onJoin(String channel, String sender, String login, String hostname)  {
-		for (BotModule m : loadedModules.values()) {
-			m.onJoin(channel, sender, login, hostname);
-		}
-	}
-	
-	@Override
-	protected void onJoin(String channel, String sender, String login, String hostname)  {
-		for (BotModule m : loadedModules.values()) {
-			m.onJoin(channel, sender, login, hostname);
-		}
-	}
-	
-	@Override
-	protected void onJoin(String channel, String sender, String login, String hostname)  {
-		for (BotModule m : loadedModules.values()) {
-			m.onJoin(channel, sender, login, hostname);
-		}
-	}
-	
-	
-	
 	/**
 	 * Executes a command.
 	 * 
@@ -1060,6 +861,22 @@ public class SmartBot extends PircBot {
 		return modules.get(name.toUpperCase());
 	}
 	
+	@Override
+	protected void onAction(final String sender, final String login,
+			final String hostname, final String target, final String action) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onAction(sender, login, hostname, target, action);
+		}
+	}
+	
+	@Override
+	protected void onChannelInfo(final String channel, final int userCount,
+			final String topic) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onChannelInfo(channel, userCount, topic);
+		}
+	}
+	
 	/**
 	 * Performs NickServ identification and joins the primary channel.
 	 */
@@ -1069,22 +886,28 @@ public class SmartBot extends PircBot {
 			identify(nickPass);
 		}
 		joinChannel(getIntendedChannel());
-		for (BotModule m : loadedModules.values()) {
+		for (final BotModule m : loadedModules.values()) {
 			m.onConnect();
 		}
 	}
 	
 	@Override
-	protected void onDeop(String channel, String sourceNick, String sourceLogin, String sourceHostname, String recipient) {
-		for (BotModule m : loadedModules.values()) {
-			m.onDeop(channel, sourceNick, sourceLogin, sourceHostname, recipient);
+	protected void onDeop(final String channel, final String sourceNick,
+			final String sourceLogin, final String sourceHostname,
+			final String recipient) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onDeop(channel, sourceNick, sourceLogin, sourceHostname,
+					recipient);
 		}
 	}
 	
 	@Override
-	protected void onDeVoice(String channel, String sourceNick, String sourceLogin, String sourceHostname, String recipient) {
-		for (BotModule m : loadedModules.values()) {
-			m.onDeVoice(channel, sourceNick, sourceLogin, sourceHostname, recipient);
+	protected void onDeVoice(final String channel, final String sourceNick,
+			final String sourceLogin, final String sourceHostname,
+			final String recipient) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onDeVoice(channel, sourceNick, sourceLogin, sourceHostname,
+					recipient);
 		}
 	}
 	
@@ -1118,22 +941,56 @@ public class SmartBot extends PircBot {
 				dispose();
 			}
 		}
-		for (BotModule m : loadedModules.values()) {
+		for (final BotModule m : loadedModules.values()) {
 			m.onDisconnect();
 		}
 	}
 	
 	@Override
-	protected void onFileTransferFinished(DccFileTransfer transfer, Exception e) {
-		for (BotModule m : loadedModules.values()) {
+	protected void onFileTransferFinished(final DccFileTransfer transfer,
+			final Exception e) {
+		for (final BotModule m : loadedModules.values()) {
 			m.onFileTransferFinished(transfer, e);
 		}
 	}
 	
 	@Override
-	protected void onFinger(String sourceNick, String sourceLogin, String sourceHostname, String target) {
-		for (BotModule m : loadedModules.values()) {
+	protected void onFinger(final String sourceNick, final String sourceLogin,
+			final String sourceHostname, final String target) {
+		for (final BotModule m : loadedModules.values()) {
 			m.onFinger(sourceNick, sourceLogin, sourceHostname, target);
+		}
+	}
+	
+	@Override
+	protected void onIncomingChatRequest(final DccChat chat) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onIncomingChatRequest(chat);
+		}
+	}
+	
+	@Override
+	protected void onIncomingFileTransfer(final DccFileTransfer transfer) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onIncomingFileTransfer(transfer);
+		}
+	}
+	
+	@Override
+	protected void onInvite(final String targetNick, final String sourceNick,
+			final String sourceLogin, final String sourceHostname,
+			final String channel) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onInvite(targetNick, sourceNick, sourceLogin, sourceHostname,
+					channel);
+		}
+	}
+	
+	@Override
+	protected void onJoin(final String channel, final String sender,
+			final String login, final String hostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onJoin(channel, sender, login, hostname);
 		}
 	}
 	
@@ -1144,8 +1001,9 @@ public class SmartBot extends PircBot {
 	protected void onKick(final String channel, final String kickerNick,
 			final String kickerLogin, final String kickerHost,
 			final String recipient, final String reason) {
-		for (BotModule m : loadedModules.values()) {
-			m.onKick(channel, kickerNick, kickerLogin, kickerHost, recipient, reason);
+		for (final BotModule m : loadedModules.values()) {
+			m.onKick(channel, kickerNick, kickerLogin, kickerHost, recipient,
+					reason);
 		}
 		if (channel.equals(getIntendedChannel()) && recipient.equals(getNick())) {
 			// we've been kicked from the chan; be well-behaved and shutdown.
@@ -1170,9 +1028,62 @@ public class SmartBot extends PircBot {
 				execute(message.split(" "), sender, false);
 			}
 		}
-		for (BotModule m : loadedModules.values()) {
+		for (final BotModule m : loadedModules.values()) {
 			m.onMessage(channel, sender, login, hostname, message);
 		}
+	}
+	
+	@Override
+	protected void onMode(final String channel, final String sourceNick,
+			final String sourceLogin, final String sourceHostname,
+			final String mode) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onMode(channel, sourceNick, sourceLogin, sourceHostname, mode);
+		}
+	}
+	
+	@Override
+	protected void onNickChange(final String oldNick, final String login,
+			final String hostname, final String newNick) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onNickChange(oldNick, login, hostname, newNick);
+		}
+	}
+	
+	@Override
+	protected void onNotice(final String sourceNick, final String sourceLogin,
+			final String sourceHostname, final String target,
+			final String notice) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onNotice(sourceNick, sourceLogin, sourceHostname, target, notice);
+		}
+	}
+	
+	@Override
+	protected void onOp(final String channel, final String sourceNick,
+			final String sourceLogin, final String sourceHostname,
+			final String recipient) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onOp(channel, sourceNick, sourceLogin, sourceHostname, recipient);
+		}
+	}
+	
+	@Override
+	protected void onPart(final String channel, final String sender,
+			final String login, final String hostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onPart(channel, sender, login, hostname);
+		}
+	}
+	
+	@Override
+	protected void onPing(final String sourceNick, final String sourceLogin,
+			final String sourceHostname, final String target,
+			final String pingValue) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onPing(sourceNick, sourceLogin, sourceHostname, target, pingValue);
+		}
+		super.onPing(sourceNick, sourceLogin, sourceHostname, target, pingValue);
 	}
 	
 	@Override
@@ -1180,9 +1091,113 @@ public class SmartBot extends PircBot {
 			final String host, String message) {
 		message = message.trim().replaceAll(" +", " ");
 		execute(message.split(" "), sender, true);
-		for (BotModule m : loadedModules.values()) {
+		for (final BotModule m : loadedModules.values()) {
 			m.onPrivateMessage(sender, login, host, message);
 		}
+	}
+	
+	@Override
+	protected void onQuit(final String sourceNick, final String sourceLogin,
+			final String sourceHostname, final String reason) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onQuit(sourceNick, sourceLogin, sourceHostname, reason);
+		}
+	}
+	
+	@Override
+	protected void onRemoveChannelBan(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname, final String hostmask) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onRemoveChannelBan(channel, sourceNick, sourceLogin,
+					sourceHostname, hostmask);
+		}
+	}
+	
+	@Override
+	protected void onRemoveChannelKey(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname, final String key) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onRemoveChannelKey(channel, sourceNick, sourceLogin,
+					sourceHostname, key);
+		}
+	}
+	
+	@Override
+	protected void onRemoveChannelLimit(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onRemoveChannelLimit(channel, sourceNick, sourceLogin,
+					sourceHostname);
+		}
+	}
+	
+	@Override
+	protected void onRemoveInviteOnly(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onRemoveInviteOnly(channel, sourceNick, sourceLogin,
+					sourceHostname);
+		}
+	}
+	
+	@Override
+	protected void onRemoveModerated(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onRemoveModerated(channel, sourceNick, sourceLogin,
+					sourceHostname);
+		}
+	}
+	
+	@Override
+	protected void onRemoveNoExternalMessages(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onRemoveNoExternalMessages(channel, sourceNick, sourceLogin,
+					sourceHostname);
+		}
+	}
+	
+	@Override
+	protected void onRemovePrivate(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onRemovePrivate(channel, sourceNick, sourceLogin, sourceHostname);
+		}
+	}
+	
+	@Override
+	protected void onRemoveSecret(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onRemoveSecret(channel, sourceNick, sourceLogin, sourceHostname);
+		}
+	}
+	
+	@Override
+	protected void onRemoveTopicProtection(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onRemoveTopicProtection(channel, sourceNick, sourceLogin,
+					sourceHostname);
+		}
+	}
+	
+	@Override
+	protected void onServerPing(final String response) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onServerPing(response);
+		}
+		super.onServerPing(response);
 	}
 	
 	@Override
@@ -1200,8 +1215,150 @@ public class SmartBot extends PircBot {
 				}
 			}
 		}
-		for (BotModule m : loadedModules.values()) {
+		for (final BotModule m : loadedModules.values()) {
 			m.onServerResponse(code, resp);
+		}
+	}
+	
+	@Override
+	protected void onSetChannelBan(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname, final String hostmask) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onSetChannelBan(channel, sourceNick, sourceLogin, sourceHostname,
+					hostmask);
+		}
+	}
+	
+	@Override
+	protected void onSetChannelKey(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname, final String key) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onSetChannelKey(channel, sourceNick, sourceLogin, sourceHostname,
+					key);
+		}
+	}
+	
+	@Override
+	protected void onSetChannelLimit(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname, final int limit) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onSetChannelLimit(channel, sourceNick, sourceLogin,
+					sourceHostname, limit);
+		}
+	}
+	
+	@Override
+	protected void onSetInviteOnly(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onSetInviteOnly(channel, sourceNick, sourceLogin, sourceHostname);
+		}
+	}
+	
+	@Override
+	protected void onSetModerated(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onSetModerated(channel, sourceNick, sourceLogin, sourceHostname);
+		}
+	}
+	
+	@Override
+	protected void onSetNoExternalMessages(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onSetNoExternalMessages(channel, sourceNick, sourceLogin,
+					sourceHostname);
+		}
+	}
+	
+	@Override
+	protected void onSetPrivate(final String channel, final String sourceNick,
+			final String sourceLogin, final String sourceHostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onSetPrivate(channel, sourceNick, sourceLogin, sourceHostname);
+		}
+	}
+	
+	@Override
+	protected void onSetSecret(final String channel, final String sourceNick,
+			final String sourceLogin, final String sourceHostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onSetSecret(channel, sourceNick, sourceLogin, sourceHostname);
+		}
+	}
+	
+	@Override
+	protected void onSetTopicProtection(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onSetTopicProtection(channel, sourceNick, sourceLogin,
+					sourceHostname);
+		}
+	}
+	
+	@Override
+	protected void onTime(final String sourceNick, final String sourceLogin,
+			final String sourceHostname, final String target) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onTime(sourceNick, sourceLogin, sourceHostname, target);
+		}
+	}
+	
+	@Override
+	protected void onTopic(final String channel, final String topic,
+			final String setBy, final long date, final boolean changed) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onTopic(channel, topic, setBy, date, changed);
+		}
+	}
+	
+	@Override
+	protected void onUnknown(final String line) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onUnknown(line);
+		}
+	}
+	
+	@Override
+	protected void onUserList(final String channel, final User[] users) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onUserList(channel, users);
+		}
+	}
+	
+	@Override
+	protected void onUserMode(final String targetNick, final String sourceNick,
+			final String sourceLogin, final String sourceHostname,
+			final String mode) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onUserMode(targetNick, sourceNick, sourceLogin, sourceHostname,
+					mode);
+		}
+	}
+	
+	@Override
+	protected void onVersion(final String sourceNick, final String sourceLogin,
+			final String sourceHostname, final String target) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onVersion(sourceNick, sourceLogin, sourceHostname, target);
+		}
+	}
+	
+	@Override
+	protected void onVoice(final String channel, final String sourceNick,
+			final String sourceLogin, final String sourceHostname,
+			final String recipient) {
+		for (final BotModule m : loadedModules.values()) {
+			m.onVoice(channel, sourceNick, sourceLogin, sourceHostname,
+					recipient);
 		}
 	}
 }
