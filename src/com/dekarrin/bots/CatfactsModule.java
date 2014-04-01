@@ -7,12 +7,12 @@ import java.net.MalformedURLException;
 import java.net.URL;
 
 
-public class CatfactsModule extends BotModule {
+public class CatfactsModule extends Module {
 	
 	private double odds = 0.05;
 	
 	public CatfactsModule() {
-		super("FACTS");
+		super("CATFACTS", "v1.0", "Gives fun facts every so often.");
 		addCommand("SETODDS", new BotAction () {
 
 			@Override
@@ -24,6 +24,7 @@ public class CatfactsModule extends BotModule {
 							bot.sendMessage(recipient, sender + ": odds must be between 0 and 1");
 						} else {
 							CatfactsModule.this.odds = odds;
+							settings.setModuleSetting(getName(), "odds", ""+odds);
 							bot.sendMessage(recipient, sender + ": changed funfact odds to " + odds);
 						}
 					} catch (NumberFormatException e) {
@@ -44,10 +45,40 @@ public class CatfactsModule extends BotModule {
 				return "%s [odds]";
 			}
 		});
+		addCommand("GETODDS", new BotAction () {
+
+			@Override
+			public void execute(String[] params, String sender, String recipient) {
+				bot.sendMessage(recipient, sender + ": odds of a fun fact are " + odds);
+			}
+
+			@Override
+			public String help() {
+				return "Gets the odds of a fun fact";
+			}
+
+			@Override
+			public String syntax() {
+				return "%s";
+			}
+			
+		});
 	}
 	
 	@Override
-	public void onMessage(String channel, String sender, String login, String hostname, String message) {
+	protected void onModuleAdded() {
+		String val = settings.getModuleSetting(getName(), "odds");
+		if (val != null) {
+			try {
+				odds = Double.parseDouble(val);
+			} catch (NumberFormatException e) {
+				// do nothing
+			}
+		}
+	}
+	
+	@Override
+	public boolean onMessage(String channel, String sender, String login, String hostname, String message) {
 		if (Math.random() < odds) {
 			URL url = null;
 			String fact = "";
@@ -63,13 +94,16 @@ public class CatfactsModule extends BotModule {
 				input = input.replaceAll(".*\\[", "").replaceAll("].*", "").substring(1);
 				fact = input.substring(0, input.length() - 1);
 			} catch (MalformedURLException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
+				return false;
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
+				return false;
 			}
 			bot.sendMessage(bot.getIntendedChannel(), "Funfact: " + fact);
+			return true;
+		} else {
+			return false;
 		}
 	}
 	

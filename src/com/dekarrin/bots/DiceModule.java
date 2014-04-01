@@ -1,10 +1,10 @@
 package com.dekarrin.bots;
 
 
-public class DiceModule extends BotModule {
+public class DiceModule extends Module {
 
 	public DiceModule() {
-		super("DICE");
+		super("DICE", "v1.0", "Adds dice rolling.");
 		addCommand("ROLL", new BotAction() {
 
 			@Override

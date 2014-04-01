@@ -1,9 +1,12 @@
 package com.dekarrin.bots;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,6 +27,12 @@ import org.jibble.pircbot.User;
  */
 public class SmartBot extends PircBot {
 	
+	/**
+	 * Name of the core module. For ambiguity resolution, no command in any
+	 * module may have this name.
+	 */
+	public static final String CORE_MODULE_NAME = "_CORE_";
+	
 	private volatile int awaitingResponseEnd = -1;
 	
 	private volatile int awaitingResponseStart = -1;
@@ -36,11 +45,11 @@ public class SmartBot extends PircBot {
 	
 	private boolean cleanDc = false;
 	
-	private final Map<String, BotModule> loadedModules;
+	private Map<String, Module> enabledModules;
 	
 	private int maxReconnects = 3;
 	
-	private final Map<String, BotModule> modules;
+	private final Map<String, Module> modules;
 	
 	private String nickPass = null;
 	
@@ -54,6 +63,8 @@ public class SmartBot extends PircBot {
 	
 	private volatile List<String> serverResponseData = null;
 	
+	private final Settings settings;
+	
 	private int timeBetweenReconnects = 15;
 	
 	private boolean trustNickServ = false;
@@ -65,41 +76,54 @@ public class SmartBot extends PircBot {
 	 * 
 	 * @param nick The nickname that the bot should have.
 	 * @param chan The channel that this bot is intended for.
+	 * @param rcfilepath The file containing settings for this bot. If the file
+	 * doesn't exist, it will be created whenever the settings are changed.
 	 * @param modules The modules to initialize this bot with. May be null for
 	 * none.
 	 */
 	public SmartBot(final String nick, final String chan,
-			final BotModule[] modules) {
+			final String RCFilePath, final Module[] modules) {
 		setName(nick);
 		setFinger("acm-bot");
 		setLogin("acmbotsrv");
+		setVersion("NDSU ACM SmartBot v1.0 - PircBot v1.5.0");
 		setAutoNickChange(true);
+		settings = new Settings(RCFilePath, true);
 		ops = new HashSet<String>();
 		this.chan = chan;
-		loadedModules = new HashMap<String, BotModule>();
-		this.modules = new HashMap<String, BotModule>();
-		this.modules.put(null, createCoreModule());
+		enabledModules = new LinkedHashMap<String, Module>();
+		this.modules = new HashMap<String, Module>();
+		loadSettings();
 		if (modules != null) {
-			for (final BotModule m : modules) {
-				addModule(m.getName(), m);
+			for (final Module m : modules) {
+				addModule(m);
 			}
 		}
-		loadedModules.put(null, this.modules.get(null));
+		this.modules.put(SmartBot.CORE_MODULE_NAME, createCoreModule());
+		enabledModules.put(SmartBot.CORE_MODULE_NAME, this.modules.get(SmartBot.CORE_MODULE_NAME));
 	}
 	
 	/**
 	 * Adds a module to this bot. The core module cannot be overwritten by using
-	 * this method; attempts to assign a module to name 'null' (the core
-	 * module's index) will be ignored.
+	 * this method; attempts to assign a module with the same name or with a
+	 * command that has the same name will cause an Exception to be thrown.
 	 * 
-	 * @param name The name to use to address the module and to remove it later.
 	 * @param module The module to add.
 	 */
-	public void addModule(final String name, final BotModule module) {
-		if (name != null) {
-			module.setBot(this);
-			modules.put(name.toUpperCase(), module);
+	public void addModule(final Module module) {
+		if (module.getName().equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
+			throw new IllegalArgumentException("Module name '"
+					+ SmartBot.CORE_MODULE_NAME
+					+ "' is reserved for the core module");
 		}
+		if (module.hasCommand(SmartBot.CORE_MODULE_NAME)) {
+			throw new IllegalArgumentException("Command '"
+					+ SmartBot.CORE_MODULE_NAME + "' in module '"
+					+ module.getName()
+					+ "' conflicts with the core module name");
+		}
+		module.setBot(this, settings);
+		modules.put(module.getName().toUpperCase(), module);
 	}
 	
 	/**
@@ -109,6 +133,7 @@ public class SmartBot extends PircBot {
 	 */
 	public void addOperator(final String op) {
 		ops.add(op.toUpperCase());
+		settings.setNickOp(op.toUpperCase(), true);
 	}
 	
 	/**
@@ -133,12 +158,34 @@ public class SmartBot extends PircBot {
 	}
 	
 	/**
+	 * Enables all modules as specified by persistence settings. Any modules
+	 * that are listed but are not currently added to this bot are skipped.
+	 */
+	public void enableModulesFromSettings() {
+		enabledModules = new LinkedHashMap<String, Module>();
+		for (final String module : settings.getEnabledModules()) {
+			if (hasModule(module)) {
+				enabledModules.put(module, getModule(module));
+			}
+		}
+	}
+	
+	/**
 	 * Gets the channel that this bot was designed for.
 	 * 
 	 * @return The channel name.
 	 */
 	public String getIntendedChannel() {
 		return chan;
+	}
+	
+	/**
+	 * Checks if a module is loaded.
+	 * 
+	 * @param module The name of the module to check.
+	 */
+	public boolean getModuleEnabled(final String module) {
+		return enabledModules.containsKey(module.toUpperCase());
 	}
 	
 	/**
@@ -182,25 +229,12 @@ public class SmartBot extends PircBot {
 	}
 	
 	/**
-	 * Checks if a module is loaded.
-	 * 
-	 * @param module The name of the module to check.
-	 */
-	public boolean hasLoadedModule(final String module) {
-		return loadedModules.containsKey(module.toUpperCase());
-	}
-	
-	/**
 	 * Checks if a module exists.
 	 * 
 	 * @param name The name to check for.
 	 */
 	public boolean hasModule(final String name) {
-		if (name != null) {
-			return modules.containsKey(name.toUpperCase());
-		} else {
-			return true;
-		}
+		return modules.containsKey(name.toUpperCase());
 	}
 	
 	/**
@@ -224,25 +258,14 @@ public class SmartBot extends PircBot {
 	}
 	
 	/**
-	 * Loads a module.
-	 * 
-	 * @param module The name of the module to load.
-	 */
-	public void loadModule(final String module) {
-		final BotModule mod = getModule(module);
-		if (mod != null) {
-			loadedModules.put(module.toUpperCase(), mod);
-		}
-	}
-	
-	/**
 	 * Removes a module from this bot. The core module cannot be removed in this
 	 * manner.
 	 * 
 	 * @param name The name of the module to remove.
 	 */
 	public void removeModule(final String name) {
-		if (name != null) {
+		if (!name.equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
+			setModuleEnabled(name, false);
 			modules.remove(name.toUpperCase());
 		}
 	}
@@ -254,6 +277,7 @@ public class SmartBot extends PircBot {
 	 */
 	public void removeOperator(final String op) {
 		ops.remove(op.toUpperCase());
+		settings.setNickOp(op, false);
 	}
 	
 	/**
@@ -349,6 +373,30 @@ public class SmartBot extends PircBot {
 	}
 	
 	/**
+	 * Sets whether a module is enabled.
+	 * 
+	 * @param module The name of the module to disable/enable.
+	 * @param enable Whether to enable the module.
+	 */
+	public void setModuleEnabled(final String module, final boolean enable) {
+		if (enable) {
+			final Module mod = getModule(module);
+			if (mod != null) {
+				enabledModules.put(module.toUpperCase(), mod);
+				mod.onModuleEnabled();
+			}
+		} else {
+			if (!module.equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
+				final Module m = enabledModules.remove(module.toUpperCase());
+				if (m != null) {
+					m.onModuleDisabled();
+				}
+			}
+		}
+		settings.setModuleEnabled(module, enable);
+	}
+	
+	/**
 	 * Sets the NickServ identify password for this bot. Set to null if NickServ
 	 * identification is not required. Setting to anything but null implicitly
 	 * also calls setTrustNickServ(true).
@@ -371,6 +419,7 @@ public class SmartBot extends PircBot {
 	public void setOwner(final String op) {
 		addOperator(op);
 		owner = op.toUpperCase();
+		settings.setModuleSetting(CORE_MODULE_NAME, "owner", owner);
 	}
 	
 	/**
@@ -417,23 +466,13 @@ public class SmartBot extends PircBot {
 	}
 	
 	/**
-	 * Unloads a module.
-	 * 
-	 * @param module The name of the module to unload.
-	 */
-	public void unloadModule(final String module) {
-		if (module != null) {
-			loadedModules.remove(module.toUpperCase());
-		}
-	}
-	
-	/**
 	 * Creates the core module containing base commands for a SmartBot.
 	 * 
 	 * @return The core module.
 	 */
-	private BotModule createCoreModule() {
-		final BotModule module = new BotModule(null);
+	private Module createCoreModule() {
+		final Module module = new Module(SmartBot.CORE_MODULE_NAME, "v1.3",
+				"Built-in bot commands");
 		module.addCommand("KILL", new BotAction() {
 			
 			@Override
@@ -460,11 +499,12 @@ public class SmartBot extends PircBot {
 			@Override
 			public void execute(final String[] params, final String sender,
 					final String recipient) {
-				String msg = sender + ": Modules (* = loaded): *(CORE)";
+				String msg = sender + ": Modules (* = enabled): *("
+						+ SmartBot.CORE_MODULE_NAME + ")";
 				for (final String name : modules.keySet()) {
-					if (name != null) {
+					if (!name.equalsIgnoreCase(CORE_MODULE_NAME)) {
 						msg += ", ";
-						if (hasLoadedModule(name)) {
+						if (getModuleEnabled(name)) {
 							msg += "*";
 						}
 						msg += name.toUpperCase();
@@ -488,35 +528,71 @@ public class SmartBot extends PircBot {
 			public void execute(final String[] params, final String user,
 					final String recipient) {
 				String command = null;
-				String module = null;
-				if (params.length > 0) {
-					command = params[0];
-					if (params.length > 1) {
-						module = params[1].toUpperCase();
+				String moduleName = null;
+				if (params.length > 1) {
+					moduleName = params[0].toUpperCase();
+					command = params[1].toUpperCase();
+				} else if (params.length == 1) {
+					// assume module first; this ambiguity can always be
+					// resolved
+					// by user putting in the name of the core module.
+					if (hasModule(params[0])) {
+						moduleName = params[0].toUpperCase();
+					} else {
+						command = params[0].toUpperCase();
 					}
 				}
-				if ((command == null) && (module == null)) {
-					getCoreModule().execute("LIST", params, user, recipient);
-				} else {
-					BotModule mod = null;
-					if (module == null) {
+				if ((command == null) && (moduleName == null)) {
+					String msg1 = user + ": use LIST to see a list of core ";
+					msg1 += "commands, ";
+					msg1 += "or LIST [module] to list commands in a module, ";
+					String msg2 = user + ": use HELP [command] for help with a";
+					msg2 += " core command, HELP [module] for help with a ";
+					msg2 += "module, or HELP [module] [command] for help with ";
+					msg2 += "a command in a module.";
+					String msg3 = user + ": anywhere a module is accepted, ";
+					msg3 += SmartBot.CORE_MODULE_NAME
+							+ " specifies the core module";
+					sendMessage(recipient, user + ": " + getVersion());
+					sendMessage(recipient, msg1);
+					sendMessage(recipient, msg2);
+					sendMessage(recipient, msg3);
+				} else if ((moduleName != null) && (command == null)) {
+					// user did HELP [MODULE], and we assume module exists
+					Module mod = null;
+					if (moduleName.equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
 						mod = getCoreModule();
 					} else {
-						mod = getModule(module);
+						mod = getModule(moduleName);
 					}
-					if ((mod == null) && (module != null)) {
-						sendNoSuchModule(recipient, user, module);
+					final String m1 = user + ": " + mod.getName() + " "
+							+ mod.getVersion();
+					final String m2 = user + ": " + mod.getHelp();
+					final String m3 = user + ": " + "Type LIST '"
+							+ mod.getName() + "' to see commands";
+					sendMessage(recipient, m1);
+					sendMessage(recipient, m2);
+					sendMessage(recipient, m3);
+				} else {
+					Module mod = null;
+					if (moduleName == null) {
+						mod = getCoreModule();
+					} else {
+						mod = getModule(moduleName);
+					}
+					if ((mod == null)) {
+						sendNoSuchModule(recipient, user, moduleName);
 					} else {
 						if (mod.hasCommand(command)) {
-							final String help = mod.getHelp(command);
-							final String syntax = mod.getSyntax(command);
+							final String help = mod.getCommandHelp(command);
+							final String syntax = mod.getCommandSyntax(command);
 							sendMessage(recipient, user + ": Syntax - "
 									+ syntax);
 							sendMessage(recipient, user + ": " + help);
 						} else {
 							sendMessage(recipient, user + ": command '"
 									+ command + "' does not exist in module '"
-									+ module + "'");
+									+ moduleName + "'");
 						}
 					}
 				}
@@ -529,7 +605,7 @@ public class SmartBot extends PircBot {
 			
 			@Override
 			public String syntax() {
-				return "%s <command> <module>";
+				return "%1$s <module>, %1$s <command>, %1$s <module> <command>";
 			}
 		}).addCommand("OP", new BotAction() {
 			
@@ -603,32 +679,79 @@ public class SmartBot extends PircBot {
 			public String syntax() {
 				return "%s [nick]";
 			}
+		}).addCommand("SHOWOPS", new BotAction() {
+			
+			@Override
+			public void execute(final String[] params, final String user,
+					final String recipient) {
+				sendMessage(recipient, user + ": Registered bot operators:");
+				int num = 0;
+				String msg1 = user + ": ";
+				for (String op : ops) {
+					if (op.equalsIgnoreCase(owner)) {
+						msg1 += "Owner:";
+					}
+					msg1 += op + " ";
+					num++;
+					if (num == 5) {
+						sendMessage(recipient, msg1);
+						msg1 = user + ": ";
+						num = 0;
+					}
+				}
+				if (num != 0) {
+					sendMessage(recipient, msg1);
+				}
+			}
+			
+			@Override
+			public String help() {
+				return "Lists bot operators";
+			}
+			
+			@Override
+			public String syntax() {
+				return "%s";
+			}
 		}).addCommand("LIST", new BotAction() {
 			
 			@Override
 			public void execute(final String[] params, final String sender,
 					final String recipient) {
-				String mod = null;
+				Module module = null;
+				String opening = null;
 				if (params.length > 0) {
-					mod = params[1];
-				}
-				BotModule module = null;
-				if (mod == null) {
-					sendMessage(recipient, sender + ": core commands:");
-					module = getCoreModule();
-				} else {
-					if (!hasModule(mod)) {
-						sendMessage(recipient, sender + ": module '" + mod
-								+ "' doesn't exist");
-						return;
+					if (params[0].equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
+						module = getCoreModule();
+						opening = sender + ": core commands:";
+					} else {
+						module = getModule(params[0]);
+						if (module != null) {
+							opening = sender + ": " + module.getName()
+									+ " commands:";
+						}
 					}
-					sendMessage(recipient, sender + ": commands in module '"
-							+ mod.toUpperCase() + "':");
-					module = getModule(mod);
+				} else {
+					module = getCoreModule();
+					opening = sender + ": core commands:";
 				}
-				for (final String n : module.getCommandNames()) {
-					sendMessage(recipient, sender + ": " + n + " - "
-							+ getCoreModule().getHelp(n));
+				if (module == null) {
+					sendMessage(recipient,
+							sender + ": module '" + params[0].toUpperCase()
+									+ "' doesn't exist");
+				} else {
+					if (module.getCommandNames().length > 0) {
+						sendMessage(recipient, opening);
+						for (final String n : module.getCommandNames()) {
+							sendMessage(recipient, sender + ": " + n + " - "
+									+ module.getCommandHelp(n));
+						}
+						sendMessage(recipient, sender + ": End command list");
+					} else {
+						sendMessage(recipient,
+								sender + ": module '" + module.getName()
+										+ "' has no commands");
+					}
 				}
 			}
 			
@@ -641,7 +764,7 @@ public class SmartBot extends PircBot {
 			public String syntax() {
 				return "%s <module>";
 			}
-		}).addCommand("LOAD", new BotAction() {
+		}).addCommand("ENABLE", new BotAction() {
 			
 			@Override
 			public void execute(final String[] params, final String sender,
@@ -650,13 +773,13 @@ public class SmartBot extends PircBot {
 					if (params.length > 0) {
 						final String mod = params[0].toUpperCase();
 						if (hasModule(mod)) {
-							if (!hasLoadedModule(mod)) {
-								loadModule(mod);
+							if (!getModuleEnabled(mod)) {
+								setModuleEnabled(mod, true);
 								sendMessage(recipient, sender + ": module '"
-										+ mod + "' successfully loaded");
+										+ mod + "' successfully enabled");
 							} else {
 								sendMessage(recipient, sender + ": module '"
-										+ mod + "' is already loaded");
+										+ mod + "' is already enabled");
 							}
 						} else {
 							sendNoSuchModule(recipient, sender, mod);
@@ -678,7 +801,7 @@ public class SmartBot extends PircBot {
 			public String syntax() {
 				return "%s [module]";
 			}
-		}).addCommand("UNLOAD", new BotAction() {
+		}).addCommand("DISABLE", new BotAction() {
 			
 			@Override
 			public void execute(final String[] params, final String sender,
@@ -687,13 +810,21 @@ public class SmartBot extends PircBot {
 					if (params.length > 0) {
 						final String mod = params[0].toUpperCase();
 						if (hasModule(mod)) {
-							if (hasLoadedModule(mod)) {
-								unloadModule(mod);
-								sendMessage(recipient, sender + ": module '"
-										+ mod + "' successfully unloaded");
+							if (getModuleEnabled(mod)) {
+								if (mod.equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
+									sendMessage(
+											recipient,
+											sender
+													+ ": core module cannot be disabled");
+								} else {
+									setModuleEnabled(mod, false);
+									sendMessage(recipient, sender
+											+ ": module '" + mod
+											+ "' successfully disabled");
+								}
 							} else {
 								sendMessage(recipient, sender + ": module '"
-										+ mod + "' is already unloaded");
+										+ mod + "' is already disabled");
 							}
 						} else {
 							sendNoSuchModule(recipient, sender, mod);
@@ -764,25 +895,27 @@ public class SmartBot extends PircBot {
 	 */
 	private boolean executeCommand(final String[] argv, final String sender,
 			final String recipient) {
-		final BotModule core = getCoreModule();
+		final Module core = getCoreModule();
 		if (core.hasCommand(argv[0])) {
 			// first priority is assume core module.
 			final String[] params = Arrays.copyOfRange(argv, 1, argv.length);
 			return core.execute(argv[0], params, sender, recipient);
-		} else if (hasLoadedModule(argv[0])) {
+		} else if (getModuleEnabled(argv[0])) {
 			// next priority is assume named module
 			if (argv.length > 1) {
-				final String[] params = Arrays.copyOfRange(argv, 2, argv.length);
+				final String[] params = Arrays
+						.copyOfRange(argv, 2, argv.length);
 				return getModule(argv[0]).execute(argv[1], params, sender,
-					recipient);
+						recipient);
 			} else {
-				sendMessage(recipient, sender + ": '" + argv[0] + "' - is a module");
+				sendMessage(recipient, sender + ": '" + argv[0]
+						+ "' - is a module");
 				return true;
 			}
 		} else {
 			// finally, search all modules for the command
-			final List<BotModule> candidates = new ArrayList<BotModule>();
-			for (final BotModule mod : loadedModules.values()) {
+			final List<Module> candidates = new ArrayList<Module>();
+			for (final Module mod : enabledModules.values()) {
 				if (mod.hasCommand(argv[0])) {
 					candidates.add(mod);
 				}
@@ -844,6 +977,28 @@ public class SmartBot extends PircBot {
 	}
 	
 	/**
+	 * Loads the settings and immediately sets ops and owner.
+	 */
+	private void loadSettings() {
+		try {
+			settings.read();
+		} catch (final FileNotFoundException e) {
+			return;
+		} catch (final IOException e) {
+			e.printStackTrace();
+			return;
+		}
+		// assuming it didn't fail, set state from settings.
+		// DO NOT SET MODULE ENABLING; we don't know if all the modules have
+		// yet been added.
+		for (final String op : settings.getOperators()) {
+			ops.add(op);
+		}
+		owner = settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "owner");
+		ops.add(owner);
+	}
+	
+	/**
 	 * Gets the default module containing base commands. The core module is
 	 * never allowed to be unloaded and thus provides a guarantee that the
 	 * commands it contains are always available. The core module may be
@@ -851,8 +1006,8 @@ public class SmartBot extends PircBot {
 	 * 
 	 * @return The default module.
 	 */
-	protected BotModule getCoreModule() {
-		return modules.get(null);
+	protected Module getCoreModule() {
+		return modules.get(SmartBot.CORE_MODULE_NAME);
 	}
 	
 	/**
@@ -862,23 +1017,31 @@ public class SmartBot extends PircBot {
 	 * @param name The name of the module to get.
 	 * @return The named module, or null if the module does not exist.
 	 */
-	protected BotModule getModule(final String name) {
-		return modules.get(name.toUpperCase());
+	protected Module getModule(final String name) {
+		if (!name.equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
+			return modules.get(name.toUpperCase());
+		} else {
+			return null;
+		}
 	}
 	
 	@Override
 	protected void onAction(final String sender, final String login,
 			final String hostname, final String target, final String action) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onAction(sender, login, hostname, target, action);
+		for (final Module m : enabledModules.values()) {
+			if (m.onAction(sender, login, hostname, target, action)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onChannelInfo(final String channel, final int userCount,
 			final String topic) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onChannelInfo(channel, userCount, topic);
+		for (final Module m : enabledModules.values()) {
+			if (m.onChannelInfo(channel, userCount, topic)) {
+				break;
+			}
 		}
 	}
 	
@@ -891,8 +1054,10 @@ public class SmartBot extends PircBot {
 			identify(nickPass);
 		}
 		joinChannel(getIntendedChannel());
-		for (final BotModule m : loadedModules.values()) {
-			m.onConnect();
+		for (final Module m : enabledModules.values()) {
+			if (m.onConnect()) {
+				break;
+			}
 		}
 	}
 	
@@ -900,9 +1065,11 @@ public class SmartBot extends PircBot {
 	protected void onDeop(final String channel, final String sourceNick,
 			final String sourceLogin, final String sourceHostname,
 			final String recipient) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onDeop(channel, sourceNick, sourceLogin, sourceHostname,
-					recipient);
+		for (final Module m : enabledModules.values()) {
+			if (m.onDeop(channel, sourceNick, sourceLogin, sourceHostname,
+					recipient)) {
+				break;
+			}
 		}
 	}
 	
@@ -910,9 +1077,11 @@ public class SmartBot extends PircBot {
 	protected void onDeVoice(final String channel, final String sourceNick,
 			final String sourceLogin, final String sourceHostname,
 			final String recipient) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onDeVoice(channel, sourceNick, sourceLogin, sourceHostname,
-					recipient);
+		for (final Module m : enabledModules.values()) {
+			if (m.onDeVoice(channel, sourceNick, sourceLogin, sourceHostname,
+					recipient)) {
+				break;
+			}
 		}
 	}
 	
@@ -922,6 +1091,11 @@ public class SmartBot extends PircBot {
 	 */
 	@Override
 	protected void onDisconnect() {
+		for (final Module m : enabledModules.values()) {
+			if (m.onDisconnect()) {
+				break;
+			}
+		}
 		if (cleanDc) {
 			dispose();
 		} else {
@@ -946,38 +1120,43 @@ public class SmartBot extends PircBot {
 				dispose();
 			}
 		}
-		for (final BotModule m : loadedModules.values()) {
-			m.onDisconnect();
-		}
 	}
 	
 	@Override
 	protected void onFileTransferFinished(final DccFileTransfer transfer,
 			final Exception e) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onFileTransferFinished(transfer, e);
+		for (final Module m : enabledModules.values()) {
+			if (m.onFileTransferFinished(transfer, e)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onFinger(final String sourceNick, final String sourceLogin,
 			final String sourceHostname, final String target) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onFinger(sourceNick, sourceLogin, sourceHostname, target);
+		for (final Module m : enabledModules.values()) {
+			if (m.onFinger(sourceNick, sourceLogin, sourceHostname, target)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onIncomingChatRequest(final DccChat chat) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onIncomingChatRequest(chat);
+		for (final Module m : enabledModules.values()) {
+			if (m.onIncomingChatRequest(chat)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onIncomingFileTransfer(final DccFileTransfer transfer) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onIncomingFileTransfer(transfer);
+		for (final Module m : enabledModules.values()) {
+			if (m.onIncomingFileTransfer(transfer)) {
+				break;
+			}
 		}
 	}
 	
@@ -985,17 +1164,21 @@ public class SmartBot extends PircBot {
 	protected void onInvite(final String targetNick, final String sourceNick,
 			final String sourceLogin, final String sourceHostname,
 			final String channel) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onInvite(targetNick, sourceNick, sourceLogin, sourceHostname,
-					channel);
+		for (final Module m : enabledModules.values()) {
+			if (m.onInvite(targetNick, sourceNick, sourceLogin, sourceHostname,
+					channel)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onJoin(final String channel, final String sender,
 			final String login, final String hostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onJoin(channel, sender, login, hostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onJoin(channel, sender, login, hostname)) {
+				break;
+			}
 		}
 	}
 	
@@ -1006,9 +1189,11 @@ public class SmartBot extends PircBot {
 	protected void onKick(final String channel, final String kickerNick,
 			final String kickerLogin, final String kickerHost,
 			final String recipient, final String reason) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onKick(channel, kickerNick, kickerLogin, kickerHost, recipient,
-					reason);
+		for (final Module m : enabledModules.values()) {
+			if (m.onKick(channel, kickerNick, kickerLogin, kickerHost,
+					recipient, reason)) {
+				break;
+			}
 		}
 		if (channel.equals(getIntendedChannel()) && recipient.equals(getNick())) {
 			// we've been kicked from the chan; be well-behaved and shutdown.
@@ -1020,9 +1205,10 @@ public class SmartBot extends PircBot {
 	@Override
 	protected void onMessage(final String channel, final String sender,
 			final String login, final String hostname, String message) {
+		boolean consume = false;
 		if (channel.equals(getIntendedChannel())) {
 			int cmdPre = 0;
-			if (message.toLowerCase().startsWith(getNick() + ":")) {
+			if (message.toUpperCase().startsWith(getNick().toUpperCase() + ":")) {
 				cmdPre = (getNick() + ":").length();
 			} else if (usePrependChar && message.startsWith(prependChar + "")) {
 				cmdPre = 1;
@@ -1031,10 +1217,15 @@ public class SmartBot extends PircBot {
 				message = message.substring(cmdPre).trim()
 						.replaceAll(" +", " ");
 				execute(message.split(" "), sender, false);
+				consume = true;
 			}
 		}
-		for (final BotModule m : loadedModules.values()) {
-			m.onMessage(channel, sender, login, hostname, message);
+		if (!consume) {
+			for (final Module m : enabledModules.values()) {
+				if (m.onMessage(channel, sender, login, hostname, message)) {
+					break;
+				}
+			}
 		}
 	}
 	
@@ -1042,16 +1233,20 @@ public class SmartBot extends PircBot {
 	protected void onMode(final String channel, final String sourceNick,
 			final String sourceLogin, final String sourceHostname,
 			final String mode) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onMode(channel, sourceNick, sourceLogin, sourceHostname, mode);
+		for (final Module m : enabledModules.values()) {
+			if (m.onMode(channel, sourceNick, sourceLogin, sourceHostname, mode)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onNickChange(final String oldNick, final String login,
 			final String hostname, final String newNick) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onNickChange(oldNick, login, hostname, newNick);
+		for (final Module m : enabledModules.values()) {
+			if (m.onNickChange(oldNick, login, hostname, newNick)) {
+				break;
+			}
 		}
 	}
 	
@@ -1059,8 +1254,11 @@ public class SmartBot extends PircBot {
 	protected void onNotice(final String sourceNick, final String sourceLogin,
 			final String sourceHostname, final String target,
 			final String notice) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onNotice(sourceNick, sourceLogin, sourceHostname, target, notice);
+		for (final Module m : enabledModules.values()) {
+			if (m.onNotice(sourceNick, sourceLogin, sourceHostname, target,
+					notice)) {
+				break;
+			}
 		}
 	}
 	
@@ -1068,16 +1266,21 @@ public class SmartBot extends PircBot {
 	protected void onOp(final String channel, final String sourceNick,
 			final String sourceLogin, final String sourceHostname,
 			final String recipient) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onOp(channel, sourceNick, sourceLogin, sourceHostname, recipient);
+		for (final Module m : enabledModules.values()) {
+			if (m.onOp(channel, sourceNick, sourceLogin, sourceHostname,
+					recipient)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onPart(final String channel, final String sender,
 			final String login, final String hostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onPart(channel, sender, login, hostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onPart(channel, sender, login, hostname)) {
+				break;
+			}
 		}
 	}
 	
@@ -1085,8 +1288,11 @@ public class SmartBot extends PircBot {
 	protected void onPing(final String sourceNick, final String sourceLogin,
 			final String sourceHostname, final String target,
 			final String pingValue) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onPing(sourceNick, sourceLogin, sourceHostname, target, pingValue);
+		for (final Module m : enabledModules.values()) {
+			if (m.onPing(sourceNick, sourceLogin, sourceHostname, target,
+					pingValue)) {
+				break;
+			}
 		}
 		super.onPing(sourceNick, sourceLogin, sourceHostname, target, pingValue);
 	}
@@ -1096,16 +1302,20 @@ public class SmartBot extends PircBot {
 			final String host, String message) {
 		message = message.trim().replaceAll(" +", " ");
 		execute(message.split(" "), sender, true);
-		for (final BotModule m : loadedModules.values()) {
-			m.onPrivateMessage(sender, login, host, message);
+		for (final Module m : enabledModules.values()) {
+			if (m.onPrivateMessage(sender, login, host, message)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onQuit(final String sourceNick, final String sourceLogin,
 			final String sourceHostname, final String reason) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onQuit(sourceNick, sourceLogin, sourceHostname, reason);
+		for (final Module m : enabledModules.values()) {
+			if (m.onQuit(sourceNick, sourceLogin, sourceHostname, reason)) {
+				break;
+			}
 		}
 	}
 	
@@ -1113,9 +1323,11 @@ public class SmartBot extends PircBot {
 	protected void onRemoveChannelBan(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname, final String hostmask) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onRemoveChannelBan(channel, sourceNick, sourceLogin,
-					sourceHostname, hostmask);
+		for (final Module m : enabledModules.values()) {
+			if (m.onRemoveChannelBan(channel, sourceNick, sourceLogin,
+					sourceHostname, hostmask)) {
+				break;
+			}
 		}
 	}
 	
@@ -1123,9 +1335,11 @@ public class SmartBot extends PircBot {
 	protected void onRemoveChannelKey(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname, final String key) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onRemoveChannelKey(channel, sourceNick, sourceLogin,
-					sourceHostname, key);
+		for (final Module m : enabledModules.values()) {
+			if (m.onRemoveChannelKey(channel, sourceNick, sourceLogin,
+					sourceHostname, key)) {
+				break;
+			}
 		}
 	}
 	
@@ -1133,9 +1347,11 @@ public class SmartBot extends PircBot {
 	protected void onRemoveChannelLimit(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onRemoveChannelLimit(channel, sourceNick, sourceLogin,
-					sourceHostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onRemoveChannelLimit(channel, sourceNick, sourceLogin,
+					sourceHostname)) {
+				break;
+			}
 		}
 	}
 	
@@ -1143,9 +1359,11 @@ public class SmartBot extends PircBot {
 	protected void onRemoveInviteOnly(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onRemoveInviteOnly(channel, sourceNick, sourceLogin,
-					sourceHostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onRemoveInviteOnly(channel, sourceNick, sourceLogin,
+					sourceHostname)) {
+				break;
+			}
 		}
 	}
 	
@@ -1153,9 +1371,11 @@ public class SmartBot extends PircBot {
 	protected void onRemoveModerated(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onRemoveModerated(channel, sourceNick, sourceLogin,
-					sourceHostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onRemoveModerated(channel, sourceNick, sourceLogin,
+					sourceHostname)) {
+				break;
+			}
 		}
 	}
 	
@@ -1163,9 +1383,11 @@ public class SmartBot extends PircBot {
 	protected void onRemoveNoExternalMessages(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onRemoveNoExternalMessages(channel, sourceNick, sourceLogin,
-					sourceHostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onRemoveNoExternalMessages(channel, sourceNick, sourceLogin,
+					sourceHostname)) {
+				break;
+			}
 		}
 	}
 	
@@ -1173,8 +1395,11 @@ public class SmartBot extends PircBot {
 	protected void onRemovePrivate(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onRemovePrivate(channel, sourceNick, sourceLogin, sourceHostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onRemovePrivate(channel, sourceNick, sourceLogin,
+					sourceHostname)) {
+				break;
+			}
 		}
 	}
 	
@@ -1182,8 +1407,11 @@ public class SmartBot extends PircBot {
 	protected void onRemoveSecret(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onRemoveSecret(channel, sourceNick, sourceLogin, sourceHostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onRemoveSecret(channel, sourceNick, sourceLogin,
+					sourceHostname)) {
+				break;
+			}
 		}
 	}
 	
@@ -1191,16 +1419,20 @@ public class SmartBot extends PircBot {
 	protected void onRemoveTopicProtection(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onRemoveTopicProtection(channel, sourceNick, sourceLogin,
-					sourceHostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onRemoveTopicProtection(channel, sourceNick, sourceLogin,
+					sourceHostname)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onServerPing(final String response) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onServerPing(response);
+		for (final Module m : enabledModules.values()) {
+			if (m.onServerPing(response)) {
+				break;
+			}
 		}
 		super.onServerPing(response);
 	}
@@ -1220,8 +1452,10 @@ public class SmartBot extends PircBot {
 				}
 			}
 		}
-		for (final BotModule m : loadedModules.values()) {
-			m.onServerResponse(code, resp);
+		for (final Module m : enabledModules.values()) {
+			if (m.onServerResponse(code, resp)) {
+				break;
+			}
 		}
 	}
 	
@@ -1229,9 +1463,11 @@ public class SmartBot extends PircBot {
 	protected void onSetChannelBan(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname, final String hostmask) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onSetChannelBan(channel, sourceNick, sourceLogin, sourceHostname,
-					hostmask);
+		for (final Module m : enabledModules.values()) {
+			if (m.onSetChannelBan(channel, sourceNick, sourceLogin,
+					sourceHostname, hostmask)) {
+				break;
+			}
 		}
 	}
 	
@@ -1239,9 +1475,11 @@ public class SmartBot extends PircBot {
 	protected void onSetChannelKey(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname, final String key) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onSetChannelKey(channel, sourceNick, sourceLogin, sourceHostname,
-					key);
+		for (final Module m : enabledModules.values()) {
+			if (m.onSetChannelKey(channel, sourceNick, sourceLogin,
+					sourceHostname, key)) {
+				break;
+			}
 		}
 	}
 	
@@ -1249,9 +1487,11 @@ public class SmartBot extends PircBot {
 	protected void onSetChannelLimit(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname, final int limit) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onSetChannelLimit(channel, sourceNick, sourceLogin,
-					sourceHostname, limit);
+		for (final Module m : enabledModules.values()) {
+			if (m.onSetChannelLimit(channel, sourceNick, sourceLogin,
+					sourceHostname, limit)) {
+				break;
+			}
 		}
 	}
 	
@@ -1259,8 +1499,11 @@ public class SmartBot extends PircBot {
 	protected void onSetInviteOnly(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onSetInviteOnly(channel, sourceNick, sourceLogin, sourceHostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onSetInviteOnly(channel, sourceNick, sourceLogin,
+					sourceHostname)) {
+				break;
+			}
 		}
 	}
 	
@@ -1268,8 +1511,11 @@ public class SmartBot extends PircBot {
 	protected void onSetModerated(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onSetModerated(channel, sourceNick, sourceLogin, sourceHostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onSetModerated(channel, sourceNick, sourceLogin,
+					sourceHostname)) {
+				break;
+			}
 		}
 	}
 	
@@ -1277,25 +1523,31 @@ public class SmartBot extends PircBot {
 	protected void onSetNoExternalMessages(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onSetNoExternalMessages(channel, sourceNick, sourceLogin,
-					sourceHostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onSetNoExternalMessages(channel, sourceNick, sourceLogin,
+					sourceHostname)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onSetPrivate(final String channel, final String sourceNick,
 			final String sourceLogin, final String sourceHostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onSetPrivate(channel, sourceNick, sourceLogin, sourceHostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onSetPrivate(channel, sourceNick, sourceLogin, sourceHostname)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onSetSecret(final String channel, final String sourceNick,
 			final String sourceLogin, final String sourceHostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onSetSecret(channel, sourceNick, sourceLogin, sourceHostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onSetSecret(channel, sourceNick, sourceLogin, sourceHostname)) {
+				break;
+			}
 		}
 	}
 	
@@ -1303,39 +1555,49 @@ public class SmartBot extends PircBot {
 	protected void onSetTopicProtection(final String channel,
 			final String sourceNick, final String sourceLogin,
 			final String sourceHostname) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onSetTopicProtection(channel, sourceNick, sourceLogin,
-					sourceHostname);
+		for (final Module m : enabledModules.values()) {
+			if (m.onSetTopicProtection(channel, sourceNick, sourceLogin,
+					sourceHostname)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onTime(final String sourceNick, final String sourceLogin,
 			final String sourceHostname, final String target) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onTime(sourceNick, sourceLogin, sourceHostname, target);
+		for (final Module m : enabledModules.values()) {
+			if (m.onTime(sourceNick, sourceLogin, sourceHostname, target)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onTopic(final String channel, final String topic,
 			final String setBy, final long date, final boolean changed) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onTopic(channel, topic, setBy, date, changed);
+		for (final Module m : enabledModules.values()) {
+			if (m.onTopic(channel, topic, setBy, date, changed)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onUnknown(final String line) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onUnknown(line);
+		for (final Module m : enabledModules.values()) {
+			if (m.onUnknown(line)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onUserList(final String channel, final User[] users) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onUserList(channel, users);
+		for (final Module m : enabledModules.values()) {
+			if (m.onUserList(channel, users)) {
+				break;
+			}
 		}
 	}
 	
@@ -1343,17 +1605,21 @@ public class SmartBot extends PircBot {
 	protected void onUserMode(final String targetNick, final String sourceNick,
 			final String sourceLogin, final String sourceHostname,
 			final String mode) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onUserMode(targetNick, sourceNick, sourceLogin, sourceHostname,
-					mode);
+		for (final Module m : enabledModules.values()) {
+			if (m.onUserMode(targetNick, sourceNick, sourceLogin,
+					sourceHostname, mode)) {
+				break;
+			}
 		}
 	}
 	
 	@Override
 	protected void onVersion(final String sourceNick, final String sourceLogin,
 			final String sourceHostname, final String target) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onVersion(sourceNick, sourceLogin, sourceHostname, target);
+		for (final Module m : enabledModules.values()) {
+			if (m.onVersion(sourceNick, sourceLogin, sourceHostname, target)) {
+				break;
+			}
 		}
 	}
 	
@@ -1361,9 +1627,11 @@ public class SmartBot extends PircBot {
 	protected void onVoice(final String channel, final String sourceNick,
 			final String sourceLogin, final String sourceHostname,
 			final String recipient) {
-		for (final BotModule m : loadedModules.values()) {
-			m.onVoice(channel, sourceNick, sourceLogin, sourceHostname,
-					recipient);
+		for (final Module m : enabledModules.values()) {
+			if (m.onVoice(channel, sourceNick, sourceLogin, sourceHostname,
+					recipient)) {
+				break;
+			}
 		}
 	}
 }

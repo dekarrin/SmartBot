@@ -4,15 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-public class GreetModule extends BotModule {
+public class GreetModule extends Module {
+	
+	private List<String> greets = new ArrayList<String>();
 	
 	public GreetModule() {
-		super("GREET");
-	}
-	
-	@Override
-	public void onJoin(String channel, String sender, String login, String hostname) {
-		List<String> greets = new ArrayList<String>();
+		super("GREET", "v1.0.2", "Gives a greeting when a user joins the channel.");
 		greets.add("Ahoy there, %s!");
 		greets.add("Hello, %s.");
 		greets.add("Yo, 'sup, %s?");
@@ -31,11 +28,25 @@ public class GreetModule extends BotModule {
 		greets.add("And here we have the most important person in this room: %s");
 		greets.add("What's up, %s?");
 		greets.add("Ah, it's the legendary %s");
-		greets.add("The hero of time, %s, has come to save us from Ganon!");
+		greets.add("Ooh! The hero of time, %s, has come to save us from Ganon!");
+		greets.add("Expert coder %s! Hello!");
+		greets.add("Leet haxor %s in the house!");
+		greets.add("We've been graced with the presence of %s. Excellent!");
+		greets.add("Ah, good. You're finally here, %s.");
+		greets.add("All right, %s is here! Now the party can get started!");
+		greets.add("Well, well, well. If it isn't %s.");
+		greets.add("And the room got a little brighter as %s stepped into it. Glad to see you :)");
+	}
+	
+	@Override
+	public boolean onJoin(String channel, String sender, String login, String hostname) {
 		if (!sender.equals(bot.getNick())) {
 			int msgIndex = (new java.util.Random()).nextInt(greets.size());
 			String msg = String.format(greets.get(msgIndex), sender);
 			bot.sendMessage(bot.getIntendedChannel(), msg);
+			return true;
+		} else {
+			return false;
 		}
 	}
 	
