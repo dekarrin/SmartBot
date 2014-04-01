@@ -771,9 +771,14 @@ public class SmartBot extends PircBot {
 			return core.execute(argv[0], params, sender, recipient);
 		} else if (hasLoadedModule(argv[0])) {
 			// next priority is assume named module
-			final String[] params = Arrays.copyOfRange(argv, 2, argv.length);
-			return getModule(argv[0]).execute(argv[1], params, sender,
+			if (argv.length > 1) {
+				final String[] params = Arrays.copyOfRange(argv, 2, argv.length);
+				return getModule(argv[0]).execute(argv[1], params, sender,
 					recipient);
+			} else {
+				sendMessage(recipient, sender + ": '" + argv[0] + "' - is a module");
+				return true;
+			}
 		} else {
 			// finally, search all modules for the command
 			final List<BotModule> candidates = new ArrayList<BotModule>();
