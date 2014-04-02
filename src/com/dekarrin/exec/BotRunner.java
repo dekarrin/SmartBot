@@ -13,7 +13,8 @@ public class BotRunner {
 				new DiceModule(),
 				new SarcasmModule(),
 				new CatfactsModule(),
-				new GreetModule()
+				new GreetModule(),
+				new DateTimeModule()
 		});
 		bot.enableModulesFromSettings();
 		bot.setPrependChar('%');

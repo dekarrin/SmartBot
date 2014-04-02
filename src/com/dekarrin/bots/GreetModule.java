@@ -9,7 +9,7 @@ public class GreetModule extends Module {
 	private List<String> greets = new ArrayList<String>();
 	
 	public GreetModule() {
-		super("GREET", "v1.0.2", "Gives a greeting when a user joins the channel.");
+		super("GREET", "v1.0.3", "Gives a greeting when a user joins the channel.");
 		greets.add("Ahoy there, %s!");
 		greets.add("Hello, %s.");
 		greets.add("Yo, 'sup, %s?");
@@ -36,6 +36,8 @@ public class GreetModule extends Module {
 		greets.add("All right, %s is here! Now the party can get started!");
 		greets.add("Well, well, well. If it isn't %s.");
 		greets.add("And the room got a little brighter as %s stepped into it. Glad to see you :)");
+		greets.add("Oh hey! It's %s!");
+		greets.add("omg omg OMG OMG! %1$s is here! %1$s is so cool...");
 	}
 	
 	@Override
