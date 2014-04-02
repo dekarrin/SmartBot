@@ -277,7 +277,7 @@ public class SmartBot extends PircBot {
 	 */
 	public void removeOperator(final String op) {
 		ops.remove(op.toUpperCase());
-		settings.setNickOp(op, false);
+		settings.setNickOp(op.toUpperCase(), false);
 	}
 	
 	/**
