@@ -4,6 +4,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -49,7 +50,7 @@ public class SmartBot extends PircBot {
 	
 	private int maxReconnects = 3;
 	
-	private final Map<String, Module> modules;
+	private Map<String, Module> modules;
 	
 	private String nickPass = null;
 	
@@ -86,21 +87,26 @@ public class SmartBot extends PircBot {
 		setName(nick);
 		setFinger("acm-bot");
 		setLogin("acmbotsrv");
-		setVersion("NDSU ACM SmartBot v1.0 - PircBot v1.5.0");
+		setVersion("NDSU ACM SmartBot %s - PircBot v1.5.0");
 		setAutoNickChange(true);
 		settings = new Settings(RCFilePath, true);
 		ops = new HashSet<String>();
 		this.chan = chan;
+		loadModules(modules);
+	}
+	
+	public void loadModules(final Module[] modulesToAdd) {
 		enabledModules = new LinkedHashMap<String, Module>();
 		this.modules = new HashMap<String, Module>();
 		loadSettings();
 		if (modules != null) {
-			for (final Module m : modules) {
+			for (final Module m : modulesToAdd) {
 				addModule(m);
 			}
 		}
-		this.modules.put(SmartBot.CORE_MODULE_NAME, createCoreModule());
-		enabledModules.put(SmartBot.CORE_MODULE_NAME, this.modules.get(SmartBot.CORE_MODULE_NAME));
+		this.modules.put(SmartBot.CORE_MODULE_NAME, new CoreModule());
+		enabledModules.put(SmartBot.CORE_MODULE_NAME,
+				this.modules.get(SmartBot.CORE_MODULE_NAME));
 	}
 	
 	/**
@@ -171,6 +177,18 @@ public class SmartBot extends PircBot {
 	}
 	
 	/**
+	 * Gets the default module containing base commands. The core module is
+	 * never allowed to be unloaded and thus provides a guarantee that the
+	 * commands it contains are always available. The core module may be
+	 * modified to suit the needs of subclasses.
+	 * 
+	 * @return The default module.
+	 */
+	public Module getCoreModule() {
+		return modules.get(SmartBot.CORE_MODULE_NAME);
+	}
+	
+	/**
 	 * Gets the channel that this bot was designed for.
 	 * 
 	 * @return The channel name.
@@ -180,12 +198,55 @@ public class SmartBot extends PircBot {
 	}
 	
 	/**
+	 * Gets the named module. The core module CANNOT be retrieved in this
+	 * manner.
+	 * 
+	 * @param name The name of the module to get.
+	 * @return The named module, or null if the module does not exist.
+	 */
+	public Module getModule(final String name) {
+		if (!name.equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
+			return modules.get(name.toUpperCase());
+		} else {
+			return null;
+		}
+	}
+	
+	/**
 	 * Checks if a module is loaded.
 	 * 
 	 * @param module The name of the module to check.
 	 */
 	public boolean getModuleEnabled(final String module) {
 		return enabledModules.containsKey(module.toUpperCase());
+	}
+	
+	/**
+	 * Gets the names of the modules in this Bot.
+	 * 
+	 * @return An unmodifiable set of modules. The order is guaranteed to be the
+	 * same as the order that they were loaded into this bot.
+	 */
+	public Set<String> getModuleNames() {
+		return Collections.unmodifiableSet(modules.keySet());
+	}
+	
+	/**
+	 * Gets an unmodifiable view of the operators set.
+	 * 
+	 * @return The operators.
+	 */
+	public Set<String> getOperators() {
+		return Collections.unmodifiableSet(ops);
+	}
+	
+	/**
+	 * Gets the owner of this bot.
+	 * 
+	 * @return The owner.
+	 */
+	public String getOwner() {
+		return owner;
 	}
 	
 	/**
@@ -419,7 +480,7 @@ public class SmartBot extends PircBot {
 	public void setOwner(final String op) {
 		addOperator(op);
 		owner = op.toUpperCase();
-		settings.setModuleSetting(CORE_MODULE_NAME, "owner", owner);
+		settings.setModuleSetting(SmartBot.CORE_MODULE_NAME, "owner", owner);
 	}
 	
 	/**
@@ -463,391 +524,6 @@ public class SmartBot extends PircBot {
 	 */
 	public void setUsePrepend(final boolean u) {
 		usePrependChar = u;
-	}
-	
-	/**
-	 * Creates the core module containing base commands for a SmartBot.
-	 * 
-	 * @return The core module.
-	 */
-	private Module createCoreModule() {
-		final Module module = new Module(SmartBot.CORE_MODULE_NAME, "v1.3",
-				"Built-in bot commands");
-		module.addCommand("KILL", new BotAction() {
-			
-			@Override
-			public void execute(final String[] params, final String user,
-					final String recipient) {
-				if (isAuthorized(user)) {
-					cleanDisconnect("Terminated by user '" + user + "'");
-				} else {
-					sendNotAuthorized(recipient, user);
-				}
-			}
-			
-			@Override
-			public String help() {
-				return "Terminates this bot";
-			}
-			
-			@Override
-			public String syntax() {
-				return "%s";
-			}
-		}).addCommand("MODULES", new BotAction() {
-			
-			@Override
-			public void execute(final String[] params, final String sender,
-					final String recipient) {
-				String msg = sender + ": Modules (* = enabled): *("
-						+ SmartBot.CORE_MODULE_NAME + ")";
-				for (final String name : modules.keySet()) {
-					if (!name.equalsIgnoreCase(CORE_MODULE_NAME)) {
-						msg += ", ";
-						if (getModuleEnabled(name)) {
-							msg += "*";
-						}
-						msg += name.toUpperCase();
-					}
-				}
-				sendMessage(recipient, msg);
-			}
-			
-			@Override
-			public String help() {
-				return "Lists the modules on this bot.";
-			}
-			
-			@Override
-			public String syntax() {
-				return "%s";
-			}
-		}).addCommand("HELP", new BotAction() {
-			
-			@Override
-			public void execute(final String[] params, final String user,
-					final String recipient) {
-				String command = null;
-				String moduleName = null;
-				if (params.length > 1) {
-					moduleName = params[0].toUpperCase();
-					command = params[1].toUpperCase();
-				} else if (params.length == 1) {
-					// assume module first; this ambiguity can always be
-					// resolved
-					// by user putting in the name of the core module.
-					if (hasModule(params[0])) {
-						moduleName = params[0].toUpperCase();
-					} else {
-						command = params[0].toUpperCase();
-					}
-				}
-				if ((command == null) && (moduleName == null)) {
-					String msg1 = user + ": use LIST to see a list of core ";
-					msg1 += "commands, ";
-					msg1 += "or LIST [module] to list commands in a module, ";
-					String msg2 = user + ": use HELP [command] for help with a";
-					msg2 += " core command, HELP [module] for help with a ";
-					msg2 += "module, or HELP [module] [command] for help with ";
-					msg2 += "a command in a module.";
-					String msg3 = user + ": anywhere a module is accepted, ";
-					msg3 += SmartBot.CORE_MODULE_NAME
-							+ " specifies the core module";
-					sendMessage(recipient, user + ": " + getVersion());
-					sendMessage(recipient, msg1);
-					sendMessage(recipient, msg2);
-					sendMessage(recipient, msg3);
-				} else if ((moduleName != null) && (command == null)) {
-					// user did HELP [MODULE], and we assume module exists
-					Module mod = null;
-					if (moduleName.equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
-						mod = getCoreModule();
-					} else {
-						mod = getModule(moduleName);
-					}
-					final String m1 = user + ": " + mod.getName() + " "
-							+ mod.getVersion();
-					final String m2 = user + ": " + mod.getHelp();
-					final String m3 = user + ": " + "Type LIST '"
-							+ mod.getName() + "' to see commands";
-					sendMessage(recipient, m1);
-					sendMessage(recipient, m2);
-					sendMessage(recipient, m3);
-				} else {
-					Module mod = null;
-					if (moduleName == null) {
-						mod = getCoreModule();
-					} else {
-						mod = getModule(moduleName);
-					}
-					if ((mod == null)) {
-						sendNoSuchModule(recipient, user, moduleName);
-					} else {
-						if (mod.hasCommand(command)) {
-							final String help = mod.getCommandHelp(command);
-							final String syntax = mod.getCommandSyntax(command);
-							sendMessage(recipient, user + ": Syntax - "
-									+ syntax);
-							sendMessage(recipient, user + ": " + help);
-						} else {
-							sendMessage(recipient, user + ": command '"
-									+ command + "' does not exist in module '"
-									+ moduleName + "'");
-						}
-					}
-				}
-			}
-			
-			@Override
-			public String help() {
-				return "Lists out the help for a module";
-			}
-			
-			@Override
-			public String syntax() {
-				return "%1$s <module>, %1$s <command>, %1$s <module> <command>";
-			}
-		}).addCommand("OP", new BotAction() {
-			
-			@Override
-			public void execute(final String[] params, final String user,
-					final String recipient) {
-				if (isAuthorized(user)) {
-					if (params.length > 0) {
-						final String toOp = params[0];
-						if (!hasOperator(toOp)) {
-							addOperator(toOp);
-							sendMessage(recipient, user
-									+ ": bot operator was granted to " + toOp);
-						} else {
-							sendMessage(recipient, user + ": " + toOp
-									+ " is already an operator.");
-						}
-					} else {
-						sendBadSyntax(recipient, user);
-					}
-				} else {
-					sendNotAuthorized(recipient, user);
-				}
-			}
-			
-			@Override
-			public String help() {
-				return "Grants bot operator status to a user";
-			}
-			
-			@Override
-			public String syntax() {
-				return "%s [nick]";
-			}
-		}).addCommand("DEOP", new BotAction() {
-			
-			@Override
-			public void execute(final String[] params, final String user,
-					final String recipient) {
-				if (isAuthorized(user)) {
-					if (params.length > 0) {
-						final String toDeop = params[0];
-						if (hasOperator(toDeop)) {
-							if (!owner.equals(toDeop.toUpperCase())) {
-								removeOperator(toDeop);
-								sendMessage(recipient, user
-										+ ": bot operator was revoked from "
-										+ toDeop);
-							} else {
-								sendMessage(recipient, user
-										+ ": you cannot deop the bot owner!");
-							}
-						} else {
-							sendMessage(recipient, user + ": " + toDeop
-									+ " is not an operator.");
-						}
-					} else {
-						sendBadSyntax(recipient, user);
-					}
-				} else {
-					sendNotAuthorized(recipient, user);
-				}
-			}
-			
-			@Override
-			public String help() {
-				return "Revokes bot operator status from a user";
-			}
-			
-			@Override
-			public String syntax() {
-				return "%s [nick]";
-			}
-		}).addCommand("SHOWOPS", new BotAction() {
-			
-			@Override
-			public void execute(final String[] params, final String user,
-					final String recipient) {
-				sendMessage(recipient, user + ": Registered bot operators:");
-				int num = 0;
-				String msg1 = user + ": ";
-				for (String op : ops) {
-					if (op.equalsIgnoreCase(owner)) {
-						msg1 += "Owner:";
-					}
-					msg1 += op + " ";
-					num++;
-					if (num == 5) {
-						sendMessage(recipient, msg1);
-						msg1 = user + ": ";
-						num = 0;
-					}
-				}
-				if (num != 0) {
-					sendMessage(recipient, msg1);
-				}
-			}
-			
-			@Override
-			public String help() {
-				return "Lists bot operators";
-			}
-			
-			@Override
-			public String syntax() {
-				return "%s";
-			}
-		}).addCommand("LIST", new BotAction() {
-			
-			@Override
-			public void execute(final String[] params, final String sender,
-					final String recipient) {
-				Module module = null;
-				String opening = null;
-				if (params.length > 0) {
-					if (params[0].equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
-						module = getCoreModule();
-						opening = sender + ": core commands:";
-					} else {
-						module = getModule(params[0]);
-						if (module != null) {
-							opening = sender + ": " + module.getName()
-									+ " commands:";
-						}
-					}
-				} else {
-					module = getCoreModule();
-					opening = sender + ": core commands:";
-				}
-				if (module == null) {
-					sendMessage(recipient,
-							sender + ": module '" + params[0].toUpperCase()
-									+ "' doesn't exist");
-				} else {
-					if (module.getCommandNames().length > 0) {
-						sendMessage(recipient, opening);
-						for (final String n : module.getCommandNames()) {
-							sendMessage(recipient, sender + ": " + n + " - "
-									+ module.getCommandHelp(n));
-						}
-						sendMessage(recipient, sender + ": End command list");
-					} else {
-						sendMessage(recipient,
-								sender + ": module '" + module.getName()
-										+ "' has no commands");
-					}
-				}
-			}
-			
-			@Override
-			public String help() {
-				return "Shows the commands in a module";
-			}
-			
-			@Override
-			public String syntax() {
-				return "%s <module>";
-			}
-		}).addCommand("ENABLE", new BotAction() {
-			
-			@Override
-			public void execute(final String[] params, final String sender,
-					final String recipient) {
-				if (isAuthorized(sender)) {
-					if (params.length > 0) {
-						final String mod = params[0].toUpperCase();
-						if (hasModule(mod)) {
-							if (!getModuleEnabled(mod)) {
-								setModuleEnabled(mod, true);
-								sendMessage(recipient, sender + ": module '"
-										+ mod + "' successfully enabled");
-							} else {
-								sendMessage(recipient, sender + ": module '"
-										+ mod + "' is already enabled");
-							}
-						} else {
-							sendNoSuchModule(recipient, sender, mod);
-						}
-					} else {
-						sendBadSyntax(recipient, sender);
-					}
-				} else {
-					sendNotAuthorized(recipient, sender);
-				}
-			}
-			
-			@Override
-			public String help() {
-				return "Enables a module";
-			}
-			
-			@Override
-			public String syntax() {
-				return "%s [module]";
-			}
-		}).addCommand("DISABLE", new BotAction() {
-			
-			@Override
-			public void execute(final String[] params, final String sender,
-					final String recipient) {
-				if (isAuthorized(sender)) {
-					if (params.length > 0) {
-						final String mod = params[0].toUpperCase();
-						if (hasModule(mod)) {
-							if (getModuleEnabled(mod)) {
-								if (mod.equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
-									sendMessage(
-											recipient,
-											sender
-													+ ": core module cannot be disabled");
-								} else {
-									setModuleEnabled(mod, false);
-									sendMessage(recipient, sender
-											+ ": module '" + mod
-											+ "' successfully disabled");
-								}
-							} else {
-								sendMessage(recipient, sender + ": module '"
-										+ mod + "' is already disabled");
-							}
-						} else {
-							sendNoSuchModule(recipient, sender, mod);
-						}
-					} else {
-						sendBadSyntax(recipient, sender);
-					}
-				} else {
-					sendNotAuthorized(recipient, sender);
-				}
-			}
-			
-			@Override
-			public String help() {
-				return "Disables a module";
-			}
-			
-			@Override
-			public String syntax() {
-				return "%s [module]";
-			}
-		});
-		return module;
 	}
 	
 	/**
@@ -992,37 +668,11 @@ public class SmartBot extends PircBot {
 		// DO NOT SET MODULE ENABLING; we don't know if all the modules have
 		// yet been added.
 		for (final String op : settings.getOperators()) {
-			ops.add(op);
+			ops.add(op.toUpperCase());
 		}
-		owner = settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "owner");
-		ops.add(owner);
-	}
-	
-	/**
-	 * Gets the default module containing base commands. The core module is
-	 * never allowed to be unloaded and thus provides a guarantee that the
-	 * commands it contains are always available. The core module may be
-	 * modified to suit the needs of subclasses.
-	 * 
-	 * @return The default module.
-	 */
-	protected Module getCoreModule() {
-		return modules.get(SmartBot.CORE_MODULE_NAME);
-	}
-	
-	/**
-	 * Gets the named module. The core module CANNOT be retrieved in this
-	 * manner.
-	 * 
-	 * @param name The name of the module to get.
-	 * @return The named module, or null if the module does not exist.
-	 */
-	protected Module getModule(final String name) {
-		if (!name.equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
-			return modules.get(name.toUpperCase());
-		} else {
-			return null;
-		}
+		owner = settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "owner")
+				.toUpperCase();
+		ops.add(owner.toUpperCase());
 	}
 	
 	@Override
