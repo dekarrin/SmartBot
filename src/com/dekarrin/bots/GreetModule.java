@@ -45,7 +45,7 @@ public class GreetModule extends Module {
 		if (!sender.equals(bot.getNick())) {
 			int msgIndex = (new java.util.Random()).nextInt(greets.size());
 			String msg = String.format(greets.get(msgIndex), sender);
-			bot.sendMessage(bot.getIntendedChannel(), msg);
+			bot.sendMessage(bot.getChannel(), msg);
 			return true;
 		} else {
 			return false;

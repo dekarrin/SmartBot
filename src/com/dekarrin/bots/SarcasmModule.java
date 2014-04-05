@@ -81,7 +81,7 @@ public class SarcasmModule extends Module {
 		boolean swearing = message.toUpperCase().contains("fuck you".toUpperCase());
 		if (addressingMe && swearing) {
 			String msg = "No, " + sender + ", fuck YOU";
-			bot.sendMessage(bot.getIntendedChannel(), msg);
+			bot.sendMessage(bot.getChannel(), msg);
 			return true;
 		} else {
 			List<String> remarks = new ArrayList<String>();
@@ -91,7 +91,7 @@ public class SarcasmModule extends Module {
 			if (Math.random() < odds) {
 				int msgIndex = (new java.util.Random()).nextInt(remarks.size());
 				String msg = String.format(remarks.get(msgIndex), sender);
-				bot.sendMessage(bot.getIntendedChannel(), msg);
+				bot.sendMessage(bot.getChannel(), msg);
 				return true;
 			} else {
 				return false;

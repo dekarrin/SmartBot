@@ -25,7 +25,7 @@ public class Module {
 	
 	private final String version;
 	
-	protected SmartBot bot;
+	protected SmartBotInterface bot;
 	
 	protected Settings settings;
 	
@@ -426,7 +426,7 @@ public class Module {
 	 * Sets the bot associated with this module, as well as the persistence
 	 * settings object.
 	 */
-	public void setBot(final SmartBot bot, Settings settings) {
+	public void setBot(final SmartBotInterface bot, Settings settings) {
 		this.bot = bot;
 		this.settings = settings;
 		onModuleAdded();

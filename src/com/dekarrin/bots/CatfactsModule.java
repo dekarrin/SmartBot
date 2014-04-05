@@ -100,7 +100,7 @@ public class CatfactsModule extends Module {
 				e.printStackTrace();
 				return false;
 			}
-			bot.sendMessage(bot.getIntendedChannel(), "Funfact: " + fact);
+			bot.sendMessage(bot.getChannel(), "Funfact: " + fact);
 			return true;
 		} else {
 			return false;

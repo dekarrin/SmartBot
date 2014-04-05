@@ -1,7 +1,9 @@
 package com.dekarrin.bots;
 
+import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -29,6 +31,11 @@ import org.jibble.pircbot.User;
 public class SmartBot extends PircBot {
 	
 	/**
+	 * The sender when the message is from the console.
+	 */
+	public static final String CONSOLE_USER = "-CONSOLE";
+	
+	/**
 	 * Name of the core module. For ambiguity resolution, no command in any
 	 * module may have this name.
 	 */
@@ -40,15 +47,9 @@ public class SmartBot extends PircBot {
 	 */
 	public static final String VERSION = "NDSU ACM SmartBot %s - PircBot v1.5.0";
 	
-	private volatile boolean loggedIn = false;
-	
-	private volatile boolean awaitingNickServGhost = false;
-	
-	private volatile boolean loggingIn = false;
-	
 	private volatile boolean awaitingNickChange = false;
 	
-	private volatile String oldNick = null;
+	private volatile boolean awaitingNickServGhost = false;
 	
 	private volatile int awaitingResponseEnd = -1;
 	
@@ -60,9 +61,13 @@ public class SmartBot extends PircBot {
 	
 	private final String chan;
 	
-	private boolean cleanDc = false;
+	private volatile boolean cleanDc = false;
 	
 	private Map<String, Module> enabledModules;
+	
+	private volatile boolean loggedIn = false;
+	
+	private volatile boolean loggingIn = false;
 	
 	private String loginNick = null;
 	
@@ -75,6 +80,8 @@ public class SmartBot extends PircBot {
 	// TODO: Highly insecure. We should not keep the nickserv password in
 	// memory.
 	private String nickPass = null;
+	
+	private volatile String oldNick = null;
 	
 	private final Set<String> ops;
 	
@@ -115,6 +122,7 @@ public class SmartBot extends PircBot {
 		ops = new HashSet<String>();
 		this.chan = chan;
 		initialize(modules);
+		startConsoleInputThread();
 	}
 	
 	/**
@@ -136,7 +144,48 @@ public class SmartBot extends PircBot {
 					+ module.getName()
 					+ "' conflicts with the core module name");
 		}
-		module.setBot(this, settings);
+		module.setBot(new SmartBotInterface() {
+			
+			@Override
+			public void disconnect(String reason) {
+				SmartBot.this.cleanDisconnect(reason);
+			}
+			
+			@Override
+			public String getChannel() {
+				return SmartBot.this.getIntendedChannel();
+			}
+			
+			@Override
+			public String getNick() {
+				return SmartBot.this.getNick();
+			}
+			
+			@Override
+			public String getVersion() {
+				return SmartBot.this.getVersion();
+			}
+			
+			@Override
+			public boolean isAuthorized(String user) {
+				return SmartBot.this.isAuthorized(user);
+			}
+			
+			@Override
+			public void sendBadSyntax(String recipient, String user) {
+				SmartBot.this.sendBadSyntax(recipient, user);
+			}
+			
+			@Override
+			public void sendMessage(String recipient, String message) {
+				SmartBot.this.sendResponse(recipient, message);
+			}
+			
+			@Override
+			public void sendNotAuthorized(String recipient, String user) {
+				SmartBot.this.sendNotAuthorized(recipient, user);
+			}
+		}, settings);
 		modules.put(module.getName().toUpperCase(), module);
 	}
 	
@@ -166,9 +215,14 @@ public class SmartBot extends PircBot {
 	 */
 	public void cleanDisconnect(final String reason) {
 		cleanDc = true;
-		log("Normal disconnect" + ((!reason.equals("")) ? ": " + reason : ""));
+		sendMessage(getIntendedChannel(), "Disconnecting - " + reason);
 		partChannel(getIntendedChannel(), reason);
 		quitServer(reason);
+		try {
+			System.in.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	/**
@@ -185,58 +239,12 @@ public class SmartBot extends PircBot {
 	}
 	
 	/**
-	 * Gets the default module containing base commands. The core module is
-	 * never allowed to be unloaded and thus provides a guarantee that the
-	 * commands it contains are always available. The core module may be
-	 * modified to suit the needs of subclasses.
-	 * 
-	 * @return The default module.
-	 */
-	public Module getCoreModule() {
-		return modules.get(SmartBot.CORE_MODULE_NAME);
-	}
-	
-	/**
 	 * Gets the channel that this bot was designed for.
 	 * 
 	 * @return The channel name.
 	 */
 	public String getIntendedChannel() {
 		return chan;
-	}
-	
-	/**
-	 * Gets the named module. The core module CANNOT be retrieved in this
-	 * manner.
-	 * 
-	 * @param name The name of the module to get.
-	 * @return The named module, or null if the module does not exist.
-	 */
-	public Module getModule(final String name) {
-		if (!name.equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
-			return modules.get(name.toUpperCase());
-		} else {
-			return null;
-		}
-	}
-	
-	/**
-	 * Checks if a module is loaded.
-	 * 
-	 * @param module The name of the module to check.
-	 */
-	public boolean getModuleEnabled(final String module) {
-		return enabledModules.containsKey(module.toUpperCase());
-	}
-	
-	/**
-	 * Gets the names of the modules in this Bot.
-	 * 
-	 * @return An unmodifiable set of modules. The order is guaranteed to be the
-	 * same as the order that they were loaded into this bot.
-	 */
-	public Set<String> getModuleNames() {
-		return Collections.unmodifiableSet(modules.keySet());
 	}
 	
 	/**
@@ -298,15 +306,6 @@ public class SmartBot extends PircBot {
 	}
 	
 	/**
-	 * Checks if a module exists.
-	 * 
-	 * @param name The name to check for.
-	 */
-	public boolean hasModule(final String name) {
-		return modules.containsKey(name.toUpperCase());
-	}
-	
-	/**
 	 * Checks whether a username is an operator.
 	 * 
 	 * @param op The nick to check.
@@ -323,17 +322,6 @@ public class SmartBot extends PircBot {
 	public void initialize(final Module[] modulesToAdd) {
 		loadSettings();
 		loadModules(modulesToAdd);
-	}
-	
-	/**
-	 * Checks if a user is authorized to perform operator-level actions on this
-	 * bot.
-	 * 
-	 * @param user The user to check.
-	 */
-	public boolean isAuthorized(String user) {
-		user = getRegisteredNick(user);
-		return ((user != null) && hasOperator(user));
 	}
 	
 	/**
@@ -357,40 +345,6 @@ public class SmartBot extends PircBot {
 	public void removeOperator(final String op) {
 		ops.remove(op.toUpperCase());
 		settings.setNickOp(op.toUpperCase(), false);
-	}
-	
-	/**
-	 * Informs the user that they made a syntax error.
-	 * 
-	 * @param recipient
-	 * @param user
-	 */
-	public void sendBadSyntax(final String recipient, final String user) {
-		sendMessage(recipient, user + ": bad syntax");
-	}
-	
-	/**
-	 * Informs the user that the module that they specified does not exist.
-	 */
-	public void sendNoSuchModule(final String recipient, final String sender,
-			final String mod) {
-		sendMessage(recipient, sender + ": module '" + mod + "' does not exist");
-	}
-	
-	/**
-	 * Informs a user that they have attempted to perform an unauthorized
-	 * operation.
-	 * 
-	 * @param user The user to send it to.
-	 * @param recipient The place to send it to.
-	 */
-	public void sendNotAuthorized(final String recipient, final String user) {
-		String msg = user + ": You don't have permission to do that.";
-		if (trustNickServ) {
-			msg += " If you believe that you should have permission, ";
-			msg += "identify with NickServ and try again.";
-		}
-		sendMessage(recipient, msg);
 	}
 	
 	/**
@@ -557,7 +511,10 @@ public class SmartBot extends PircBot {
 	 */
 	private void execute(final String[] argv, final String user,
 			final boolean isPm) {
-		final String recipient = (isPm) ? user : getIntendedChannel();
+		String recipient = null;
+		if (!user.equals(SmartBot.CONSOLE_USER)) {
+			recipient = (isPm) ? user : getIntendedChannel();
+		}
 		class Execution implements Runnable {
 			
 			private final String[] argv;
@@ -576,7 +533,7 @@ public class SmartBot extends PircBot {
 			@Override
 			public void run() {
 				if (!executeCommand(argv, user, recipient)) {
-					sendMessage(recipient, user + ": Unknown command/module '"
+					sendResponse(recipient, user + ": Unknown command/module '"
 							+ argv[0] + "'");
 				}
 			}
@@ -607,7 +564,7 @@ public class SmartBot extends PircBot {
 				return getModule(argv[0]).execute(argv[1], params, sender,
 						recipient);
 			} else {
-				sendMessage(recipient, sender + ": '" + argv[0]
+				sendResponse(recipient, sender + ": '" + argv[0]
 						+ "' - is a module");
 				return true;
 			}
@@ -625,8 +582,8 @@ public class SmartBot extends PircBot {
 				return candidates.get(0).execute(argv[0], params, sender,
 						recipient);
 			} else if (candidates.size() > 1) {
-				sendMessage(recipient, sender + ": ambiguous command.");
-				sendMessage(recipient, sender + ": '" + argv[0]
+				sendResponse(recipient, sender + ": ambiguous command.");
+				sendResponse(recipient, sender + ": '" + argv[0]
 						+ "' exists in the following modules:");
 				String msg = "";
 				for (int i = 0; i < candidates.size(); i++) {
@@ -635,12 +592,58 @@ public class SmartBot extends PircBot {
 						msg += ", ";
 					}
 				}
-				sendMessage(recipient, msg);
+				sendResponse(recipient, msg);
 				return true;
 			} else {
 				return false;
 			}
 		}
+	}
+	
+	/**
+	 * Gets the default module containing base commands. The core module is
+	 * never allowed to be unloaded and thus provides a guarantee that the
+	 * commands it contains are always available. The core module may be
+	 * modified to suit the needs of subclasses.
+	 * 
+	 * @return The default module.
+	 */
+	private Module getCoreModule() {
+		return modules.get(SmartBot.CORE_MODULE_NAME);
+	}
+	
+	/**
+	 * Gets the named module. The core module CANNOT be retrieved in this
+	 * manner.
+	 * 
+	 * @param name The name of the module to get.
+	 * @return The named module, or null if the module does not exist.
+	 */
+	private Module getModule(final String name) {
+		if (!name.equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
+			return modules.get(name.toUpperCase());
+		} else {
+			return null;
+		}
+	}
+	
+	/**
+	 * Checks if a module is loaded.
+	 * 
+	 * @param module The name of the module to check.
+	 */
+	private boolean getModuleEnabled(final String module) {
+		return enabledModules.containsKey(module.toUpperCase());
+	}
+	
+	/**
+	 * Gets the names of the modules in this Bot.
+	 * 
+	 * @return An unmodifiable set of modules. The order is guaranteed to be the
+	 * same as the order that they were loaded into this bot.
+	 */
+	private Set<String> getModuleNames() {
+		return Collections.unmodifiableSet(modules.keySet());
 	}
 	
 	/**
@@ -675,6 +678,30 @@ public class SmartBot extends PircBot {
 		}
 	}
 	
+	/**
+	 * Checks if a module exists.
+	 * 
+	 * @param name The name to check for.
+	 */
+	private boolean hasModule(final String name) {
+		return modules.containsKey(name.toUpperCase());
+	}
+	
+	/**
+	 * Checks if a user is authorized to perform operator-level actions on this
+	 * bot.
+	 * 
+	 * @param user The user to check.
+	 */
+	private boolean isAuthorized(String user) {
+		if (user.equals(SmartBot.CONSOLE_USER)) {
+			return true;
+		} else {
+			user = getRegisteredNick(user);
+			return ((user != null) && hasOperator(user));
+		}
+	}
+	
 	private void loadModules(final Module[] modulesToAdd) {
 		enabledModules = new LinkedHashMap<String, Module>();
 		modules = new HashMap<String, Module>();
@@ -683,7 +710,106 @@ public class SmartBot extends PircBot {
 				addModule(m);
 			}
 		}
-		modules.put(SmartBot.CORE_MODULE_NAME, new CoreModule());
+		Module core = new CoreModule();
+		core.setBot(new SmartBotCoreInterface() {
+			
+			@Override
+			public void addOperator(String name) {
+				SmartBot.this.addOperator(name);
+			}
+			
+			@Override
+			public void disconnect(String reason) {
+				SmartBot.this.cleanDisconnect(reason);
+			}
+			
+			@Override
+			public String getChannel() {
+				return SmartBot.this.getIntendedChannel();
+			}
+			
+			@Override
+			public Module getModule(String name) {
+				return SmartBot.this.getModule(name);
+			}
+			
+			@Override
+			public boolean getModuleEnabled(String name) {
+				return SmartBot.this.getModuleEnabled(name);
+			}
+			
+			@Override
+			public Set<String> getModuleNames() {
+				return SmartBot.this.getModuleNames();
+			}
+			
+			@Override
+			public String getNick() {
+				return SmartBot.this.getNick();
+			}
+			
+			@Override
+			public Set<String> getOperators() {
+				return SmartBot.this.getOperators();
+			}
+			
+			@Override
+			public String getOwner() {
+				return SmartBot.this.getOwner();
+			}
+			
+			@Override
+			public String getVersion() {
+				return SmartBot.this.getVersion();
+			}
+			
+			@Override
+			public boolean hasModule(String name) {
+				return SmartBot.this.hasModule(name);
+			}
+			
+			@Override
+			public boolean hasOperator(String name) {
+				return SmartBot.this.hasOperator(name);
+			}
+			
+			@Override
+			public boolean isAuthorized(String user) {
+				return SmartBot.this.isAuthorized(user);
+			}
+			
+			@Override
+			public void removeOperator(String name) {
+				SmartBot.this.removeModule(name);
+			}
+			
+			@Override
+			public void sendBadSyntax(String recipient, String user) {
+				SmartBot.this.sendBadSyntax(recipient, user);
+			}
+			
+			@Override
+			public void sendMessage(String recipient, String message) {
+				SmartBot.this.sendResponse(recipient, message);
+			}
+			
+			@Override
+			public void sendNoSuchModule(String recipient, String user,
+					String module) {
+				SmartBot.this.sendNoSuchModule(recipient, user, module);
+			}
+			
+			@Override
+			public void sendNotAuthorized(String recipient, String user) {
+				SmartBot.this.sendNotAuthorized(recipient, user);
+			}
+			
+			@Override
+			public void setModuleEnabled(String name, boolean enabled) {
+				SmartBot.this.setModuleEnabled(name, enabled);
+			}
+		}, settings);
+		modules.put(SmartBot.CORE_MODULE_NAME, core);
 		enabledModules.put(SmartBot.CORE_MODULE_NAME,
 				modules.get(SmartBot.CORE_MODULE_NAME));
 		setVersion(String
@@ -718,6 +844,77 @@ public class SmartBot extends PircBot {
 	}
 	
 	/**
+	 * Informs the user that they made a syntax error.
+	 * 
+	 * @param recipient
+	 * @param user
+	 */
+	private void sendBadSyntax(final String recipient, final String user) {
+		sendResponse(recipient, user + ": bad syntax");
+	}
+	
+	/**
+	 * Informs the user that the module that they specified does not exist.
+	 */
+	private void sendNoSuchModule(final String recipient, final String sender,
+			final String mod) {
+		sendResponse(recipient, sender + ": module '" + mod
+				+ "' does not exist");
+	}
+	
+	/**
+	 * Informs a user that they have attempted to perform an unauthorized
+	 * operation.
+	 * 
+	 * @param user The user to send it to.
+	 * @param recipient The place to send it to.
+	 */
+	private void sendNotAuthorized(final String recipient, final String user) {
+		String msg = user + ": You don't have permission to do that.";
+		if (trustNickServ) {
+			msg += " If you believe that you should have permission, ";
+			msg += "identify with NickServ and try again.";
+		}
+		sendResponse(recipient, msg);
+	}
+	
+	/**
+	 * Sends a response to the appropriate location. DO NOT USE sendMessage()
+	 * FROM MODULES! Use this method only.
+	 */
+	private void sendResponse(String recipient, String msg) {
+		if (recipient == null) {
+			System.out.println(msg);
+		} else {
+			sendMessage(recipient, msg);
+		}
+	}
+	
+	private void startConsoleInputThread() {
+		(new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+				try {
+					while (true) {
+						String line = br.readLine();
+						execute(line.split(" "), SmartBot.CONSOLE_USER, false);
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				} finally {
+					try {
+						br.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		}, "ConsoleInput")).start();
+	}
+	
+	/**
 	 * Logs in with the nick given at construction. If the nick is not
 	 * available, this method attempts to reclaim it.
 	 */
@@ -725,7 +922,8 @@ public class SmartBot extends PircBot {
 		if (!getNick().equals(loginNick)) {
 			awaitingNickServGhost = true;
 			loggingIn = true;
-			sendMessage("NickServ", String.format("GHOST %s %s", loginNick, nickPass));
+			sendMessage("NickServ",
+					String.format("GHOST %s %s", loginNick, nickPass));
 		} else {
 			identify(nickPass);
 			loggedIn = true;
@@ -968,7 +1166,9 @@ public class SmartBot extends PircBot {
 	@Override
 	protected void onNickChange(final String oldNick, final String login,
 			final String hostname, final String newNick) {
-		if (awaitingNickChange && loggingIn && oldNick.equalsIgnoreCase(this.oldNick) && newNick.equalsIgnoreCase(loginNick)) {
+		if (awaitingNickChange && loggingIn
+				&& oldNick.equalsIgnoreCase(this.oldNick)
+				&& newNick.equalsIgnoreCase(loginNick)) {
 			awaitingNickChange = loggingIn = false;
 			identify(nickPass);
 			loggedIn = true;
