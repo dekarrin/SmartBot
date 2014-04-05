@@ -215,14 +215,7 @@ public class SmartBot extends PircBot {
 	 */
 	public void cleanDisconnect(final String reason) {
 		cleanDc = true;
-		sendMessage(getIntendedChannel(), "Disconnecting - " + reason);
 		partChannel(getIntendedChannel(), reason);
-		quitServer(reason);
-		try {
-			System.in.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
 	}
 	
 	/**
@@ -899,7 +892,9 @@ public class SmartBot extends PircBot {
 				try {
 					while (true) {
 						String line = br.readLine();
-						execute(line.split(" "), SmartBot.CONSOLE_USER, false);
+						if (!line.trim().equals("")) {
+							execute(line.trim().split(" "), SmartBot.CONSOLE_USER, false);
+						}
 					}
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -1078,8 +1073,11 @@ public class SmartBot extends PircBot {
 	@Override
 	protected void onJoin(final String channel, final String sender,
 			final String login, final String hostname) {
-		if (trustNickServ && (nickPass != null) && !loggedIn) {
-			attemptIdentify();
+		if (sender.equals(getNick())) {
+			if (trustNickServ && (nickPass != null) && !loggedIn) {
+				attemptIdentify();
+			}
+			sendMessage(getIntendedChannel(), "Initialized - " + getVersion());
 		}
 		for (final Module m : enabledModules.values()) {
 			if (m.onJoin(channel, sender, login, hostname)) {
@@ -1207,9 +1205,18 @@ public class SmartBot extends PircBot {
 	@Override
 	protected void onPart(final String channel, final String sender,
 			final String login, final String hostname) {
-		for (final Module m : enabledModules.values()) {
-			if (m.onPart(channel, sender, login, hostname)) {
-				break;
+		if (channel.equals(getIntendedChannel()) && sender.equals(getNick())) {
+			quitServer();
+			try {
+				System.in.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		} else {
+			for (final Module m : enabledModules.values()) {
+				if (m.onPart(channel, sender, login, hostname)) {
+					break;
+				}
 			}
 		}
 	}

@@ -4,7 +4,7 @@ package com.dekarrin.bots;
 public class CoreModule extends Module {
 	
 	public CoreModule() {
-		super(SmartBot.CORE_MODULE_NAME, "v1.3", "Built-in bot commands");
+		super(SmartBot.CORE_MODULE_NAME, "v0.4", "Built-in bot commands");
 		addCommand("KILL", new BotAction() {
 			
 			@Override
@@ -75,7 +75,7 @@ public class CoreModule extends Module {
 					sb.append(p + " ");
 				}
 				sb.replace(sb.length() - 1, sb.length() - 1, "");
-				bot.sendMessage(recipient, sb.toString());
+				bot.sendMessage(bot.getChannel(), sb.toString());
 			}
 		});
 		addCommand("HELP", new BotAction() {
