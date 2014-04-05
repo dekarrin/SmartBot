@@ -25,7 +25,7 @@ public class BotRunner {
 		bot.setOwner("dekarrin");
 		bot.setVerbose(true);
 		try {
-			bot.connect("irc.freenode.net");
+			bot.connect("chat.freenode.net");
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

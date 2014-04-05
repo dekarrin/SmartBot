@@ -40,6 +40,14 @@ public class SmartBot extends PircBot {
 	 */
 	public static final String VERSION = "NDSU ACM SmartBot %s - PircBot v1.5.0";
 	
+	private volatile boolean awaitingNickServGhost = false;
+	
+	private volatile boolean inIdentificationProcess = false;
+	
+	private volatile boolean awaitingNickChange = false;
+	
+	private volatile String oldNick = null;
+	
 	private volatile int awaitingResponseEnd = -1;
 	
 	private volatile int awaitingResponseStart = -1;
@@ -54,12 +62,16 @@ public class SmartBot extends PircBot {
 	
 	private Map<String, Module> enabledModules;
 	
+	private String loginNick = null;
+	
 	private int maxReconnects = 3;
 	
 	private String moduleClassPath;
 	
 	private Map<String, Module> modules;
 	
+	// TODO: Highly insecure. We should not keep the nickserv password in
+	// memory.
 	private String nickPass = null;
 	
 	private final Set<String> ops;
@@ -93,6 +105,7 @@ public class SmartBot extends PircBot {
 	public SmartBot(final String nick, final String chan,
 			final String RCFilePath, final Module[] modules) {
 		setName(nick);
+		loginNick = nick;
 		setFinger("acm-bot");
 		setLogin("acmbotsrv");
 		setAutoNickChange(true);
@@ -671,7 +684,8 @@ public class SmartBot extends PircBot {
 		modules.put(SmartBot.CORE_MODULE_NAME, new CoreModule());
 		enabledModules.put(SmartBot.CORE_MODULE_NAME,
 				modules.get(SmartBot.CORE_MODULE_NAME));
-		setVersion(String.format(VERSION, getCoreModule().getVersion()));
+		setVersion(String
+				.format(SmartBot.VERSION, getCoreModule().getVersion()));
 	}
 	
 	/**
@@ -697,8 +711,21 @@ public class SmartBot extends PircBot {
 			ops.add(owner.toUpperCase());
 			moduleClassPath = settings.getModuleSetting(
 					SmartBot.CORE_MODULE_NAME, "modulePath");
-			if (moduleClassPath == null) {
-			}
+			if (moduleClassPath == null) {}
+		}
+	}
+	
+	/**
+	 * Logs in with the nick given at construction. If the nick is not
+	 * available, this method attempts to reclaim it.
+	 */
+	protected void attemptIdentify() {
+		if (!getNick().equals(loginNick)) {
+			awaitingNickServGhost = true;
+			inIdentificationProcess = true;
+			sendMessage("NickServ", String.format("GHOST %s %s", loginNick, nickPass));
+		} else {
+			identify(nickPass);
 		}
 	}
 	
@@ -727,9 +754,6 @@ public class SmartBot extends PircBot {
 	 */
 	@Override
 	protected void onConnect() {
-		if (trustNickServ && (nickPass != null)) {
-			identify(nickPass);
-		}
 		joinChannel(getIntendedChannel());
 		for (final Module m : enabledModules.values()) {
 			if (m.onConnect()) {
@@ -852,6 +876,9 @@ public class SmartBot extends PircBot {
 	@Override
 	protected void onJoin(final String channel, final String sender,
 			final String login, final String hostname) {
+		if (trustNickServ && (nickPass != null)) {
+			attemptIdentify();
+		}
 		for (final Module m : enabledModules.values()) {
 			if (m.onJoin(channel, sender, login, hostname)) {
 				break;
@@ -877,6 +904,23 @@ public class SmartBot extends PircBot {
 			cleanDisconnect("kicked from active channel by '" + kickerNick
 					+ "'");
 		}
+	}
+	
+	/**
+	 * Called when a user (usually us) is killed from the connection. We will
+	 * not usually have this information unless we are the one being killed.
+	 * 
+	 * @param nick The nickname of the user being killed.
+	 * @param reason The reason for the killing. May be blank.
+	 */
+	protected void onKill(String nick, String reason) {
+		for (final Module m : enabledModules.values()) {
+			if (m.onKill(nick, reason)) {
+				break;
+			}
+		}
+		// we have been directly dc'd; be nice and stay dc'd.
+		cleanDc = true;
 	}
 	
 	@Override
@@ -920,6 +964,10 @@ public class SmartBot extends PircBot {
 	@Override
 	protected void onNickChange(final String oldNick, final String login,
 			final String hostname, final String newNick) {
+		if (awaitingNickChange && inIdentificationProcess && oldNick.equalsIgnoreCase(this.oldNick) && newNick.equalsIgnoreCase(loginNick)) {
+			awaitingNickChange = inIdentificationProcess = false;
+			identify(nickPass);
+		}
 		for (final Module m : enabledModules.values()) {
 			if (m.onNickChange(oldNick, login, hostname, newNick)) {
 				break;
@@ -989,6 +1037,12 @@ public class SmartBot extends PircBot {
 	@Override
 	protected void onQuit(final String sourceNick, final String sourceLogin,
 			final String sourceHostname, final String reason) {
+		if (awaitingNickServGhost && sourceNick.equalsIgnoreCase(loginNick)) {
+			awaitingNickServGhost = false;
+			awaitingNickChange = true;
+			oldNick = getNick();
+			changeNick(loginNick);
+		}
 		for (final Module m : enabledModules.values()) {
 			if (m.onQuit(sourceNick, sourceLogin, sourceHostname, reason)) {
 				break;
@@ -1262,9 +1316,21 @@ public class SmartBot extends PircBot {
 	
 	@Override
 	protected void onUnknown(final String line) {
-		for (final Module m : enabledModules.values()) {
-			if (m.onUnknown(line)) {
-				break;
+		// try to detect additional types of commands before passing it off as
+		// unknown
+		IRCMessage msg = new IRCMessage(line);
+		if (msg.getCommand().equalsIgnoreCase("KILL")) {
+			String userkilled = msg.getParams().get(0);
+			String reason = "";
+			if (msg.getParams().size() > 1) {
+				reason = msg.getParams().get(1);
+			}
+			onKill(userkilled, reason);
+		} else {
+			for (final Module m : enabledModules.values()) {
+				if (m.onUnknown(msg)) {
+					break;
+				}
 			}
 		}
 	}

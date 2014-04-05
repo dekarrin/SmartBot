@@ -1,6 +1,7 @@
 package com.dekarrin.bots;
 
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.jibble.pircbot.DccChat;
 import org.jibble.pircbot.DccFileTransfer;
@@ -18,15 +19,15 @@ public class Module {
 	
 	private final Map<String, BotAction> actions;
 	
+	private final String help;
+	
 	private final String name;
+	
+	private final String version;
 	
 	protected SmartBot bot;
 	
 	protected Settings settings;
-	
-	private String help;
-	
-	private String version;
 	
 	/**
 	 * Creates a new BotModule of the given name.
@@ -57,20 +58,6 @@ public class Module {
 	}
 	
 	/**
-	 * Gets the version of this Module.
-	 */
-	public String getVersion() {
-		return version;
-	}
-	
-	/**
-	 * Gets the help for this Module.
-	 */
-	public String getHelp() {
-		return help;
-	}
-	
-	/**
 	 * Tries to run a command with this module.
 	 * 
 	 * @param command The name of the command.
@@ -90,18 +77,6 @@ public class Module {
 	}
 	
 	/**
-	 * Gets the names of all the commands.
-	 */
-	public String[] getCommandNames() {
-		final String[] names = new String[actions.size()];
-		int i = 0;
-		for (final String s : actions.keySet()) {
-			names[i++] = s;
-		}
-		return names;
-	}
-	
-	/**
 	 * Gets the help for a command.
 	 */
 	public String getCommandHelp(final String name) {
@@ -114,12 +89,15 @@ public class Module {
 	}
 	
 	/**
-	 * Gets the name of this BotModule.
-	 * 
-	 * @return The name.
+	 * Gets the names of all the commands.
 	 */
-	public String getName() {
-		return name.toUpperCase();
+	public String[] getCommandNames() {
+		final String[] names = new String[actions.size()];
+		int i = 0;
+		for (final String s : actions.keySet()) {
+			names[i++] = s;
+		}
+		return names;
 	}
 	
 	/**
@@ -135,6 +113,29 @@ public class Module {
 	}
 	
 	/**
+	 * Gets the help for this Module.
+	 */
+	public String getHelp() {
+		return help;
+	}
+	
+	/**
+	 * Gets the name of this BotModule.
+	 * 
+	 * @return The name.
+	 */
+	public String getName() {
+		return name.toUpperCase();
+	}
+	
+	/**
+	 * Gets the version of this Module.
+	 */
+	public String getVersion() {
+		return version;
+	}
+	
+	/**
 	 * Checks whether this BotModule contains a definition for an Action.
 	 * 
 	 * @param name The command to check.
@@ -143,23 +144,6 @@ public class Module {
 	public boolean hasCommand(final String name) {
 		return actions.containsKey(name.toUpperCase());
 	}
-	
-	/**
-	 * Called when this module is enabled.
-	 */
-	public void onModuleEnabled() {}
-	
-	/**
-	 * Called when this module is disabled.
-	 */
-	public void onModuleDisabled() {}
-	
-	/**
-	 * Called when this module has been added to a bot. This method is called
-	 * once both the bot and settings variables have been set. Modules should
-	 * use this method to read settings and set internal state.
-	 */
-	protected void onModuleAdded() {}
 	
 	public boolean onAction(final String sender, final String login,
 			final String hostname, final String target, final String action) {
@@ -226,6 +210,10 @@ public class Module {
 		return false;
 	}
 	
+	public boolean onKill(String nick, String reason) {
+		return false;
+	}
+	
 	public boolean onMessage(final String channel, final String sender,
 			final String login, final String hostname, final String message) {
 		return false;
@@ -236,6 +224,16 @@ public class Module {
 			final String mode) {
 		return false;
 	}
+	
+	/**
+	 * Called when this module is disabled.
+	 */
+	public void onModuleDisabled() {}
+	
+	/**
+	 * Called when this module is enabled.
+	 */
+	public void onModuleEnabled() {}
 	
 	public boolean onNickChange(final String oldNick, final String login,
 			final String hostname, final String newNick) {
@@ -311,13 +309,15 @@ public class Module {
 		return false;
 	}
 	
-	public boolean onRemovePrivate(final String channel, final String sourceNick,
-			final String sourceLogin, final String sourceHostname) {
+	public boolean onRemovePrivate(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
 		return false;
 	}
 	
-	public boolean onRemoveSecret(final String channel, final String sourceNick,
-			final String sourceLogin, final String sourceHostname) {
+	public boolean onRemoveSecret(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
 		return false;
 	}
 	
@@ -335,15 +335,15 @@ public class Module {
 		return false;
 	}
 	
-	public boolean onSetChannelBan(final String channel, final String sourceNick,
-			final String sourceLogin, final String sourceHostname,
-			final String hostmask) {
+	public boolean onSetChannelBan(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname, final String hostmask) {
 		return false;
 	}
 	
-	public boolean onSetChannelKey(final String channel, final String sourceNick,
-			final String sourceLogin, final String sourceHostname,
-			final String key) {
+	public boolean onSetChannelKey(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname, final String key) {
 		return false;
 	}
 	
@@ -353,13 +353,15 @@ public class Module {
 		return false;
 	}
 	
-	public boolean onSetInviteOnly(final String channel, final String sourceNick,
-			final String sourceLogin, final String sourceHostname) {
+	public boolean onSetInviteOnly(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
 		return false;
 	}
 	
-	public boolean onSetModerated(final String channel, final String sourceNick,
-			final String sourceLogin, final String sourceHostname) {
+	public boolean onSetModerated(final String channel,
+			final String sourceNick, final String sourceLogin,
+			final String sourceHostname) {
 		return false;
 	}
 	
@@ -395,7 +397,7 @@ public class Module {
 		return false;
 	}
 	
-	public boolean onUnknown(final String line) {
+	public boolean onUnknown(final IRCMessage msg) {
 		return false;
 	}
 	
@@ -429,4 +431,11 @@ public class Module {
 		this.settings = settings;
 		onModuleAdded();
 	}
+	
+	/**
+	 * Called when this module has been added to a bot. This method is called
+	 * once both the bot and settings variables have been set. Modules should
+	 * use this method to read settings and set internal state.
+	 */
+	protected void onModuleAdded() {}
 }
