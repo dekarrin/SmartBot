@@ -40,9 +40,11 @@ public class SmartBot extends PircBot {
 	 */
 	public static final String VERSION = "NDSU ACM SmartBot %s - PircBot v1.5.0";
 	
+	private volatile boolean loggedIn = false;
+	
 	private volatile boolean awaitingNickServGhost = false;
 	
-	private volatile boolean inIdentificationProcess = false;
+	private volatile boolean loggingIn = false;
 	
 	private volatile boolean awaitingNickChange = false;
 	
@@ -722,10 +724,11 @@ public class SmartBot extends PircBot {
 	protected void attemptIdentify() {
 		if (!getNick().equals(loginNick)) {
 			awaitingNickServGhost = true;
-			inIdentificationProcess = true;
+			loggingIn = true;
 			sendMessage("NickServ", String.format("GHOST %s %s", loginNick, nickPass));
 		} else {
 			identify(nickPass);
+			loggedIn = true;
 		}
 	}
 	
@@ -754,6 +757,7 @@ public class SmartBot extends PircBot {
 	 */
 	@Override
 	protected void onConnect() {
+		loggedIn = false;
 		joinChannel(getIntendedChannel());
 		for (final Module m : enabledModules.values()) {
 			if (m.onConnect()) {
@@ -876,7 +880,7 @@ public class SmartBot extends PircBot {
 	@Override
 	protected void onJoin(final String channel, final String sender,
 			final String login, final String hostname) {
-		if (trustNickServ && (nickPass != null)) {
+		if (trustNickServ && (nickPass != null) && !loggedIn) {
 			attemptIdentify();
 		}
 		for (final Module m : enabledModules.values()) {
@@ -964,9 +968,10 @@ public class SmartBot extends PircBot {
 	@Override
 	protected void onNickChange(final String oldNick, final String login,
 			final String hostname, final String newNick) {
-		if (awaitingNickChange && inIdentificationProcess && oldNick.equalsIgnoreCase(this.oldNick) && newNick.equalsIgnoreCase(loginNick)) {
-			awaitingNickChange = inIdentificationProcess = false;
+		if (awaitingNickChange && loggingIn && oldNick.equalsIgnoreCase(this.oldNick) && newNick.equalsIgnoreCase(loginNick)) {
+			awaitingNickChange = loggingIn = false;
 			identify(nickPass);
+			loggedIn = true;
 		}
 		for (final Module m : enabledModules.values()) {
 			if (m.onNickChange(oldNick, login, hostname, newNick)) {
