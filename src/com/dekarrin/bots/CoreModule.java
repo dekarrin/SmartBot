@@ -56,6 +56,28 @@ public class CoreModule extends Module {
 				return "%s";
 			}
 		});
+		addCommand("ECHO", new BotAction() {
+			
+			@Override
+			public String syntax() {
+				return "%s [what to say]";
+			}
+			
+			@Override
+			public String help() {
+				return "Has the bot output something";
+			}
+			
+			@Override
+			public void execute(String[] params, String sender, String recipient) {
+				StringBuilder sb = new StringBuilder();
+				for (String p : params) {
+					sb.append(p + " ");
+				}
+				sb.replace(sb.length() - 1, sb.length() - 1, "");
+				bot.sendMessage(recipient, sb.toString());
+			}
+		});
 		addCommand("HELP", new BotAction() {
 			
 			@Override

@@ -8,6 +8,7 @@ import com.dekarrin.bots.*;
 
 public class BotRunner {
 	
+	@SuppressWarnings("resource")
 	public static void main(String[] args) {
 		Scanner scan = new Scanner(System.in);
 		System.out.println("Enter NickServ pass:");
@@ -27,9 +28,11 @@ public class BotRunner {
 		bot.setOwner("dekarrin");
 		bot.setVerbose(true);
 		try {
-			while (true) {
+			boolean connected = false;
+			while (!connected) {
 				try {
-					bot.connect("irc.freenode.net");
+					bot.connect("irc.freenode.org");
+					connected = true;
 				} catch (ConnectException e) {
 					
 				}
@@ -37,7 +40,6 @@ public class BotRunner {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		scan.close();
 	}
 	
 }
