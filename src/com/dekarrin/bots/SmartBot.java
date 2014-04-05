@@ -34,6 +34,12 @@ public class SmartBot extends PircBot {
 	 */
 	public static final String CORE_MODULE_NAME = "_CORE_";
 	
+	/**
+	 * The base version string for SmartBot. It is formatted by passing the
+	 * version number of the core module as the first format argument.
+	 */
+	public static final String VERSION = "NDSU ACM SmartBot %s - PircBot v1.5.0";
+	
 	private volatile int awaitingResponseEnd = -1;
 	
 	private volatile int awaitingResponseStart = -1;
@@ -49,6 +55,8 @@ public class SmartBot extends PircBot {
 	private Map<String, Module> enabledModules;
 	
 	private int maxReconnects = 3;
+	
+	private String moduleClassPath;
 	
 	private Map<String, Module> modules;
 	
@@ -87,26 +95,11 @@ public class SmartBot extends PircBot {
 		setName(nick);
 		setFinger("acm-bot");
 		setLogin("acmbotsrv");
-		setVersion("NDSU ACM SmartBot %s - PircBot v1.5.0");
 		setAutoNickChange(true);
 		settings = new Settings(RCFilePath, true);
 		ops = new HashSet<String>();
 		this.chan = chan;
-		loadModules(modules);
-	}
-	
-	public void loadModules(final Module[] modulesToAdd) {
-		enabledModules = new LinkedHashMap<String, Module>();
-		this.modules = new HashMap<String, Module>();
-		loadSettings();
-		if (modules != null) {
-			for (final Module m : modulesToAdd) {
-				addModule(m);
-			}
-		}
-		this.modules.put(SmartBot.CORE_MODULE_NAME, new CoreModule());
-		enabledModules.put(SmartBot.CORE_MODULE_NAME,
-				this.modules.get(SmartBot.CORE_MODULE_NAME));
+		initialize(modules);
 	}
 	
 	/**
@@ -308,6 +301,16 @@ public class SmartBot extends PircBot {
 	}
 	
 	/**
+	 * Resets all modules and settings and loads them from disk.
+	 * 
+	 * @param modulesToAdd The modules to be loaded.
+	 */
+	public void initialize(final Module[] modulesToAdd) {
+		loadSettings();
+		loadModules(modulesToAdd);
+	}
+	
+	/**
 	 * Checks if a user is authorized to perform operator-level actions on this
 	 * bot.
 	 * 
@@ -455,6 +458,11 @@ public class SmartBot extends PircBot {
 			}
 		}
 		settings.setModuleEnabled(module, enable);
+	}
+	
+	public void setModulePath(final String path) {
+		moduleClassPath = path;
+		settings.setModuleSetting(SmartBot.CORE_MODULE_NAME, "modulePath", path);
 	}
 	
 	/**
@@ -652,27 +660,46 @@ public class SmartBot extends PircBot {
 		}
 	}
 	
+	private void loadModules(final Module[] modulesToAdd) {
+		enabledModules = new LinkedHashMap<String, Module>();
+		modules = new HashMap<String, Module>();
+		if (modules != null) {
+			for (final Module m : modulesToAdd) {
+				addModule(m);
+			}
+		}
+		modules.put(SmartBot.CORE_MODULE_NAME, new CoreModule());
+		enabledModules.put(SmartBot.CORE_MODULE_NAME,
+				modules.get(SmartBot.CORE_MODULE_NAME));
+		setVersion(String.format(VERSION, getCoreModule().getVersion()));
+	}
+	
 	/**
-	 * Loads the settings and immediately sets ops and owner.
+	 * Loads the settings and immediately sets core properties.
 	 */
 	private void loadSettings() {
 		try {
 			settings.read();
 		} catch (final FileNotFoundException e) {
-			return;
+			// this is okay
 		} catch (final IOException e) {
 			e.printStackTrace();
-			return;
 		}
 		// assuming it didn't fail, set state from settings.
 		// DO NOT SET MODULE ENABLING; we don't know if all the modules have
 		// yet been added.
-		for (final String op : settings.getOperators()) {
-			ops.add(op.toUpperCase());
+		if (settings.successfullyLoaded()) {
+			for (final String op : settings.getOperators()) {
+				ops.add(op.toUpperCase());
+			}
+			owner = settings.getModuleSetting(SmartBot.CORE_MODULE_NAME,
+					"owner").toUpperCase();
+			ops.add(owner.toUpperCase());
+			moduleClassPath = settings.getModuleSetting(
+					SmartBot.CORE_MODULE_NAME, "modulePath");
+			if (moduleClassPath == null) {
+			}
 		}
-		owner = settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "owner")
-				.toUpperCase();
-		ops.add(owner.toUpperCase());
 	}
 	
 	@Override

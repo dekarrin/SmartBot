@@ -30,8 +30,6 @@ class Settings {
 		OPERATORS
 	}
 	
-	private String rcfile;
-	
 	private Map<String, String> currentModuleSettings;
 	
 	private List<String> enabledModules;
@@ -40,11 +38,15 @@ class Settings {
 	
 	private Set<String> operators;
 	
+	private final String rcfile;
+	
 	private ReadMode section = ReadMode.NONE;
 	
-	private boolean writeOnChange;
+	private boolean successfulLoad;
 	
-	public Settings(String rcfile, boolean writeOnChange) {
+	private final boolean writeOnChange;
+	
+	public Settings(final String rcfile, final boolean writeOnChange) {
 		moduleSettings = new HashMap<String, Map<String, String>>();
 		operators = new HashSet<String>();
 		enabledModules = new ArrayList<String>();
@@ -82,7 +84,8 @@ class Settings {
 		if (!moduleSettings.containsKey(mod.toUpperCase())) {
 			return null;
 		} else {
-			return moduleSettings.get(mod.toUpperCase()).get(setting.toUpperCase());
+			return moduleSettings.get(mod.toUpperCase()).get(
+					setting.toUpperCase());
 		}
 	}
 	
@@ -105,14 +108,27 @@ class Settings {
 		clear();
 		section = ReadMode.NONE;
 		String line = null;
-		final BufferedReader br = new BufferedReader(new FileReader(rcfile));
-		while ((line = br.readLine()) != null) {
-			line = line.replaceAll("#.*", "");
-			if (!line.trim().equals("")) {
-				processLine(line);
+		successfulLoad = true;
+		BufferedReader br = null;
+		try {
+			br = new BufferedReader(new FileReader(rcfile));
+			while ((line = br.readLine()) != null) {
+				line = line.replaceAll("#.*", "");
+				if (!line.trim().equals("")) {
+					processLine(line);
+				}
+			}
+		} catch (final FileNotFoundException e) {
+			successfulLoad = false;
+			throw e;
+		} catch (final IOException e) {
+			successfulLoad = false;
+			throw e;
+		} finally {
+			if (br != null) {
+				br.close();
 			}
 		}
-		br.close();
 	}
 	
 	/**
@@ -131,7 +147,7 @@ class Settings {
 		if (writeOnChange) {
 			try {
 				write();
-			} catch (IOException e) {
+			} catch (final IOException e) {
 				e.printStackTrace();
 			}
 		}
@@ -147,13 +163,14 @@ class Settings {
 	public void setModuleSetting(final String mod, final String setting,
 			final String value) {
 		if (!moduleSettings.containsKey(mod.toUpperCase())) {
-			moduleSettings.put(mod.toUpperCase(), new HashMap<String, String>());
+			moduleSettings
+					.put(mod.toUpperCase(), new HashMap<String, String>());
 		}
 		moduleSettings.get(mod.toUpperCase()).put(setting.toUpperCase(), value);
 		if (writeOnChange) {
 			try {
 				write();
-			} catch (IOException e) {
+			} catch (final IOException e) {
 				e.printStackTrace();
 			}
 		}
@@ -175,10 +192,17 @@ class Settings {
 		if (writeOnChange) {
 			try {
 				write();
-			} catch (IOException e) {
+			} catch (final IOException e) {
 				e.printStackTrace();
 			}
 		}
+	}
+	
+	/**
+	 * Checks whether the last load was successful.
+	 */
+	public boolean successfullyLoaded() {
+		return successfulLoad;
 	}
 	
 	/**
