@@ -773,7 +773,7 @@ public class SmartBot extends PircBot {
 			
 			@Override
 			public void removeOperator(String name) {
-				SmartBot.this.removeModule(name);
+				SmartBot.this.removeOperator(name);
 			}
 			
 			@Override
