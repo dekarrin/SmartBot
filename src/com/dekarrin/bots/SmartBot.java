@@ -147,6 +147,11 @@ public class SmartBot extends PircBot {
 		module.setBot(new SmartBotInterface() {
 			
 			@Override
+			public String getRegisteredNick(String nick) {
+				return SmartBot.this.getRegisteredNick(nick);
+			}
+			
+			@Override
 			public void disconnect(String reason) {
 				SmartBot.this.cleanDisconnect(reason);
 			}
@@ -705,6 +710,11 @@ public class SmartBot extends PircBot {
 		}
 		Module core = new CoreModule();
 		core.setBot(new SmartBotCoreInterface() {
+			
+			@Override
+			public String getRegisteredNick(String nick) {
+				return SmartBot.this.getRegisteredNick(nick);
+			}
 			
 			@Override
 			public void addOperator(String name) {

@@ -18,6 +18,14 @@ public interface SmartBotInterface {
 	public String getVersion();
 	
 	/**
+	 * Gets the user that the given nick is logged in as with NickServ, or null
+	 * if the nick is not logged in.
+	 * 
+	 * @return The logged in user.
+	 */
+	public String getRegisteredNick(String nick);
+	
+	/**
 	 * Gets the channel that the bot was intended for.
 	 * 
 	 * @return The channel.

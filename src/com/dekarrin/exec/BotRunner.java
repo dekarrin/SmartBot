@@ -20,7 +20,8 @@ public class BotRunner {
 				new SarcasmModule(),
 				new CatfactsModule(),
 				new GreetModule(),
-				new DateTimeModule()
+				new DateTimeModule(),
+				new GamblerModule()
 		});
 		bot.enableModulesFromSettings();
 		bot.setNickServPass(pass);

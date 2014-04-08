@@ -64,6 +64,20 @@ class Settings {
 	}
 	
 	/**
+	 * Returns all the settings for a module. The view is not editable.
+	 * 
+	 * @return The settings.
+	 */
+	public Map<String, String> getAllModuleSettings(String name) {
+		Map<String, String> sets = moduleSettings.get(name.toUpperCase());
+		if (sets != null) {
+			return Collections.unmodifiableMap(sets);
+		} else {
+			return null;
+		}
+	}
+	
+	/**
 	 * Gets the list of enabled modules, in the order that they were enabled.
 	 * The returned list is immutable; attempting to modify will result in an
 	 * exception being thrown.
@@ -270,7 +284,7 @@ class Settings {
 					break;
 				case MODULE_SETTINGS:
 				case CORE:
-					if (line.matches("[\\$A-Za-z_][0-9A-Za-z_]*=.*")) {
+					if (line.matches("[\\$A-Za-z_-][0-9A-Za-z_-]*=.*")) {
 						final String[] setting = parse(line.replaceAll("^\\s+",
 								""));
 						currentModuleSettings.put(setting[0], setting[1]);
