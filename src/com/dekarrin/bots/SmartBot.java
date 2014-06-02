@@ -16,6 +16,8 @@ import java.util.Set;
 
 import org.jibble.pircbot.DccChat;
 import org.jibble.pircbot.DccFileTransfer;
+import org.jibble.pircbot.IrcException;
+import org.jibble.pircbot.NickAlreadyInUseException;
 import org.jibble.pircbot.PircBot;
 import org.jibble.pircbot.User;
 
@@ -59,7 +61,7 @@ public class SmartBot extends PircBot {
 	
 	private volatile boolean awaitingServerResponse = false;
 	
-	private final String chan;
+	private String chan;
 	
 	private volatile boolean cleanDc = false;
 	
@@ -93,6 +95,8 @@ public class SmartBot extends PircBot {
 	
 	private volatile List<String> serverResponseData = null;
 	
+	private String server;
+	
 	private final Settings settings;
 	
 	private int timeBetweenReconnects = 15;
@@ -111,18 +115,25 @@ public class SmartBot extends PircBot {
 	 * @param modules The modules to initialize this bot with. May be null for
 	 * none.
 	 */
-	public SmartBot(final String nick, final String chan,
-			final String RCFilePath, final Module[] modules) {
-		setName(nick);
-		loginNick = nick;
-		setFinger("acm-bot");
-		setLogin("acmbotsrv");
+	public SmartBot(final String RCFilePath, final Module[] modules) {
 		setAutoNickChange(true);
 		settings = new Settings(RCFilePath, true);
 		ops = new HashSet<String>();
-		this.chan = chan;
 		initialize(modules);
+	}
+	
+	public void startConsole() {
 		startConsoleInputThread();
+	}
+	
+	public void setBotFinger(final String finger) {
+		setFinger("acm-bot");
+		settings.setModuleSetting(CORE_MODULE_NAME, "finger", finger);
+	}
+	
+	public void setBotLogin(final String login) {
+		setLogin(login);
+		settings.setModuleSetting(CORE_MODULE_NAME, "login", login);
 	}
 	
 	/**
@@ -202,6 +213,10 @@ public class SmartBot extends PircBot {
 	public void addOperator(final String op) {
 		ops.add(op.toUpperCase());
 		settings.setNickOp(op.toUpperCase(), true);
+	}
+	
+	public void connect() throws NickAlreadyInUseException, IrcException, IOException {
+		connect(server);
 	}
 	
 	/**
@@ -285,6 +300,11 @@ public class SmartBot extends PircBot {
 	 */
 	public int getTimeBetweenReconnects() {
 		return timeBetweenReconnects;
+	}
+	
+	public void setServer(String server) {
+		this.server = server;
+		settings.setModuleSetting(CORE_MODULE_NAME, "server", server);
 	}
 	
 	/**
@@ -441,9 +461,21 @@ public class SmartBot extends PircBot {
 	 */
 	public void setNickServPass(final String pass) {
 		nickPass = pass;
-		if (pass != null) {
+		if (pass != null && !pass.equals("")) {
 			setTrustNickServ(true);
 		}
+		settings.setModuleSetting(CORE_MODULE_NAME, "nickserv_pass", pass);
+	}
+	
+	public void setBotNick(final String nick) {
+		setName(nick);
+		loginNick = nick;
+		settings.setModuleSetting(SmartBot.CORE_MODULE_NAME, "nick", nick);
+	}
+	
+	public void setChannel(final String channel) {
+		chan = channel;
+		settings.setModuleSetting(SmartBot.CORE_MODULE_NAME, "channel", channel.replaceAll("#", ""));
 	}
 	
 	/**
@@ -467,6 +499,7 @@ public class SmartBot extends PircBot {
 	public void setPrependChar(final char c) {
 		prependChar = c;
 		setUsePrepend(true);
+		settings.setModuleSetting(SmartBot.CORE_MODULE_NAME, "prepend_char", c + "");
 	}
 	
 	/**
@@ -475,6 +508,7 @@ public class SmartBot extends PircBot {
 	 */
 	public void setReconnectionLimit(final int l) {
 		maxReconnects = l;
+		settings.setModuleSetting(SmartBot.CORE_MODULE_NAME, "reconnection_limit", l + "");
 	}
 	
 	/**
@@ -483,6 +517,7 @@ public class SmartBot extends PircBot {
 	 */
 	public void setTimeBetweenReconnects(final int t) {
 		timeBetweenReconnects = t;
+		settings.setModuleSetting(SmartBot.CORE_MODULE_NAME, "time_between_reconnects", t + "");
 	}
 	
 	/**
@@ -499,6 +534,7 @@ public class SmartBot extends PircBot {
 	 */
 	public void setUsePrepend(final boolean u) {
 		usePrependChar = u;
+		settings.setModuleSetting(SmartBot.CORE_MODULE_NAME, "use_prepend_char", u + "");
 	}
 	
 	/**
@@ -843,6 +879,24 @@ public class SmartBot extends PircBot {
 			moduleClassPath = settings.getModuleSetting(
 					SmartBot.CORE_MODULE_NAME, "modulePath");
 			if (moduleClassPath == null) {}
+			server = settings.getModuleSetting(CORE_MODULE_NAME, "server");
+			setFinger(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "finger"));
+			setLogin(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "login"));
+			setNickServPass(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "nickserv_pass"));
+			setChannel('#' + settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "channel"));
+			setBotNick(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "nick"));
+			setPrependChar(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "prepend_char").charAt(0));
+			setUsePrepend(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "use_prepend_char").equalsIgnoreCase("true"));
+			try {
+				setTimeBetweenReconnects(Integer.parseInt(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "time_between_reconnects")));
+			} catch (NumberFormatException e) {
+				setTimeBetweenReconnects(15);
+			}
+			try {
+				setReconnectionLimit(Integer.parseInt(settings.getModuleSetting(CORE_MODULE_NAME, "reconnection_limit")));
+			} catch (NumberFormatException e) {
+				setReconnectionLimit(3);
+			}
 		}
 	}
 	
