@@ -4,7 +4,7 @@ package com.dekarrin.bots;
 public class CoreModule extends Module {
 	
 	public CoreModule() {
-		super(SmartBot.CORE_MODULE_NAME, "v0.4.1", "Built-in bot commands");
+		super(SmartBot.CORE_MODULE_NAME, "v0.4.2", "Built-in bot commands");
 		addCommand("KILL", new BotAction() {
 			
 			@Override
@@ -171,14 +171,16 @@ public class CoreModule extends Module {
 					final String recipient) {
 				if (bot.isAuthorized(user)) {
 					if (params.length > 0) {
-						final String toOp = params[0];
-						if (!((SmartBotCoreInterface) bot).hasOperator(toOp)) {
-							((SmartBotCoreInterface) bot).addOperator(toOp);
-							bot.sendMessage(recipient, user
-									+ ": bot operator was granted to " + toOp);
-						} else {
-							bot.sendMessage(recipient, user + ": " + toOp
-									+ " is already an operator.");
+						for (int i = 0; i < params.length; i++) {
+							final String toOp = params[i];
+							if (!((SmartBotCoreInterface) bot).hasOperator(toOp)) {
+								((SmartBotCoreInterface) bot).addOperator(toOp);
+								bot.sendMessage(recipient, user
+										+ ": bot operator was granted to " + toOp);
+							} else {
+								bot.sendMessage(recipient, user + ": " + toOp
+										+ " is already an operator.");
+							}
 						}
 					} else {
 						bot.sendBadSyntax(recipient, user);
@@ -190,12 +192,12 @@ public class CoreModule extends Module {
 			
 			@Override
 			public String help() {
-				return "Grants bot operator status to a user";
+				return "Grants bot operator status to one or more users";
 			}
 			
 			@Override
 			public String syntax() {
-				return "%s [nick]";
+				return "%s [nick] <nick...>";
 			}
 		});
 		addCommand("DEOP", new BotAction() {
@@ -205,20 +207,22 @@ public class CoreModule extends Module {
 					final String recipient) {
 				if (bot.isAuthorized(user)) {
 					if (params.length > 0) {
-						final String toDeop = params[0];
-						if (((SmartBotCoreInterface) bot).hasOperator(toDeop)) {
-							if (!((SmartBotCoreInterface) bot).getOwner().equals(toDeop.toUpperCase())) {
-								((SmartBotCoreInterface) bot).removeOperator(toDeop);
-								bot.sendMessage(recipient, user
-										+ ": bot operator was revoked from "
-										+ toDeop);
+						for (int i = 0; i < params.length; i++) {
+							final String toDeop = params[i];
+							if (((SmartBotCoreInterface) bot).hasOperator(toDeop)) {
+								if (!((SmartBotCoreInterface) bot).getOwner().equals(toDeop.toUpperCase())) {
+									((SmartBotCoreInterface) bot).removeOperator(toDeop);
+									bot.sendMessage(recipient, user
+											+ ": bot operator was revoked from "
+											+ toDeop);
+								} else {
+									bot.sendMessage(recipient, user
+											+ ": you cannot deop the bot owner!");
+								}
 							} else {
-								bot.sendMessage(recipient, user
-										+ ": you cannot deop the bot owner!");
+								bot.sendMessage(recipient, user + ": " + toDeop
+										+ " is not an operator.");
 							}
-						} else {
-							bot.sendMessage(recipient, user + ": " + toDeop
-									+ " is not an operator.");
 						}
 					} else {
 						bot.sendBadSyntax(recipient, user);
@@ -230,12 +234,12 @@ public class CoreModule extends Module {
 			
 			@Override
 			public String help() {
-				return "Revokes bot operator status from a user";
+				return "Revokes bot operator status from one or more users";
 			}
 			
 			@Override
 			public String syntax() {
-				return "%s [nick]";
+				return "%s [nick] <nick...>";
 			}
 		});
 		addCommand("SHOWOPS", new BotAction() {
@@ -332,18 +336,20 @@ public class CoreModule extends Module {
 					final String recipient) {
 				if (bot.isAuthorized(sender)) {
 					if (params.length > 0) {
-						final String mod = params[0].toUpperCase();
-						if (((SmartBotCoreInterface) bot).hasModule(mod)) {
-							if (!((SmartBotCoreInterface) bot).getModuleEnabled(mod)) {
-								((SmartBotCoreInterface) bot).setModuleEnabled(mod, true);
-								bot.sendMessage(recipient, sender + ": module '"
-										+ mod + "' successfully enabled");
+						for (int i = 0; i < params.length; i++) {
+							final String mod = params[i].toUpperCase();
+							if (((SmartBotCoreInterface) bot).hasModule(mod)) {
+								if (!((SmartBotCoreInterface) bot).getModuleEnabled(mod)) {
+									((SmartBotCoreInterface) bot).setModuleEnabled(mod, true);
+									bot.sendMessage(recipient, sender + ": module '"
+											+ mod + "' successfully enabled");
+								} else {
+									bot.sendMessage(recipient, sender + ": module '"
+											+ mod + "' is already enabled");
+								}
 							} else {
-								bot.sendMessage(recipient, sender + ": module '"
-										+ mod + "' is already enabled");
+								((SmartBotCoreInterface) bot).sendNoSuchModule(recipient, sender, mod);
 							}
-						} else {
-							((SmartBotCoreInterface) bot).sendNoSuchModule(recipient, sender, mod);
 						}
 					} else {
 						bot.sendBadSyntax(recipient, sender);
@@ -355,12 +361,12 @@ public class CoreModule extends Module {
 			
 			@Override
 			public String help() {
-				return "Enables a module";
+				return "Enables one or more modules";
 			}
 			
 			@Override
 			public String syntax() {
-				return "%s [module]";
+				return "%s [module] <module...>";
 			}
 		});
 		addCommand("DISABLE", new BotAction() {
@@ -370,26 +376,28 @@ public class CoreModule extends Module {
 					final String recipient) {
 				if (bot.isAuthorized(sender)) {
 					if (params.length > 0) {
-						final String mod = params[0].toUpperCase();
-						if (((SmartBotCoreInterface) bot).hasModule(mod)) {
-							if (((SmartBotCoreInterface) bot).getModuleEnabled(mod)) {
-								if (mod.equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
-									bot.sendMessage(
-											recipient,
-											sender
-													+ ": core module cannot be disabled");
+						for (int i = 0; i < params.length; i++) {
+							final String mod = params[i].toUpperCase();
+							if (((SmartBotCoreInterface) bot).hasModule(mod)) {
+								if (((SmartBotCoreInterface) bot).getModuleEnabled(mod)) {
+									if (mod.equalsIgnoreCase(SmartBot.CORE_MODULE_NAME)) {
+										bot.sendMessage(
+												recipient,
+												sender
+														+ ": core module cannot be disabled");
+									} else {
+										((SmartBotCoreInterface) bot).setModuleEnabled(mod, false);
+										bot.sendMessage(recipient, sender
+												+ ": module '" + mod
+												+ "' successfully disabled");
+									}
 								} else {
-									((SmartBotCoreInterface) bot).setModuleEnabled(mod, false);
-									bot.sendMessage(recipient, sender
-											+ ": module '" + mod
-											+ "' successfully disabled");
+									bot.sendMessage(recipient, sender + ": module '"
+											+ mod + "' is already disabled");
 								}
 							} else {
-								bot.sendMessage(recipient, sender + ": module '"
-										+ mod + "' is already disabled");
+								((SmartBotCoreInterface) bot).sendNoSuchModule(recipient, sender, mod);
 							}
-						} else {
-							((SmartBotCoreInterface) bot).sendNoSuchModule(recipient, sender, mod);
 						}
 					} else {
 						bot.sendBadSyntax(recipient, sender);
@@ -401,12 +409,12 @@ public class CoreModule extends Module {
 			
 			@Override
 			public String help() {
-				return "Disables a module";
+				return "Disables one or more modules";
 			}
 			
 			@Override
 			public String syntax() {
-				return "%s [module]";
+				return "%s [module] <module...>";
 			}
 		});
 	}
