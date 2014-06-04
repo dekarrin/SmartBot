@@ -12,7 +12,7 @@ public class CatfactsModule extends Module {
 	private double odds = 0.05;
 	
 	public CatfactsModule() {
-		super("CATFACTS", "v1.0", "Gives fun facts every so often.");
+		super("CATFACTS", "v1.1", "Gives cat facts every so often.");
 		addCommand("SETODDS", new BotAction () {
 
 			@Override
@@ -25,7 +25,7 @@ public class CatfactsModule extends Module {
 						} else {
 							CatfactsModule.this.odds = odds;
 							settings.setModuleSetting(getName(), "odds", ""+odds);
-							bot.sendMessage(recipient, sender + ": changed funfact odds to " + odds);
+							bot.sendMessage(recipient, sender + ": changed cat fact odds to " + odds);
 						}
 					} catch (NumberFormatException e) {
 						bot.sendBadSyntax(recipient, sender);
@@ -37,7 +37,7 @@ public class CatfactsModule extends Module {
 
 			@Override
 			public String help() {
-				return "Sets the odds of generating a funfact";
+				return "Sets the odds of generating a cat fact";
 			}
 
 			@Override
@@ -49,12 +49,12 @@ public class CatfactsModule extends Module {
 
 			@Override
 			public void execute(String[] params, String sender, String recipient) {
-				bot.sendMessage(recipient, sender + ": odds of a fun fact are " + odds);
+				bot.sendMessage(recipient, sender + ": odds of a cat fact are " + odds);
 			}
 
 			@Override
 			public String help() {
-				return "Gets the odds of a fun fact";
+				return "Gets the odds of a cat fact";
 			}
 
 			@Override
@@ -92,7 +92,7 @@ public class CatfactsModule extends Module {
 				}
 				in.close();
 				input = input.replaceAll(".*\\[", "").replaceAll("].*", "").substring(1);
-				fact = input.substring(0, input.length() - 1);
+				fact = cleanFact(input.substring(0, input.length() - 1));
 			} catch (MalformedURLException e) {
 				e.printStackTrace();
 				return false;
@@ -100,11 +100,59 @@ public class CatfactsModule extends Module {
 				e.printStackTrace();
 				return false;
 			}
-			bot.sendMessage(bot.getChannel(), "Funfact: " + fact);
+			bot.sendMessage(bot.getChannel(), "Catfact: " + fact);
 			return true;
 		} else {
 			return false;
 		}
+	}
+	
+	private String cleanFact(String catfact) {
+		StringBuilder sb = new StringBuilder();
+		boolean escaping = false;
+		boolean unicodeSeq = false;
+		char[] unicodeDigits = new char[4];
+		int unicodeSeqCount = 0;
+		for (int i = 0; i < catfact.length(); i++) {
+			char c = catfact.charAt(i);
+			if (!escaping) {
+				if (c == '\\') {
+					escaping = true;
+				} else {
+					sb.append(c);
+				}
+			} else {
+				if (unicodeSeq) {
+					if (unicodeSeqCount < 4) {
+						unicodeDigits[unicodeSeqCount] = c;
+						unicodeSeqCount++;
+					} else {
+						char uni = translateUnicodeSequence(unicodeDigits);
+						sb.append(uni);
+						unicodeSeq = false;
+						escaping = false;
+					}
+				} else {
+					escaping = false;
+					if (c == 'u') {
+						escaping = true;
+						unicodeSeq = true;
+						unicodeSeqCount = 0;
+					} else if (c == '\\') {
+						sb.append(c);
+					} else if (c == '"') {
+						sb.append(c);
+					}
+				}
+			}
+		}
+		return sb.toString();
+	}
+	
+	private char translateUnicodeSequence(char[] sequence) {
+		String hex = new String(sequence);
+		int value = Integer.parseInt(hex, 16);
+		return (char)value;
 	}
 	
 }
