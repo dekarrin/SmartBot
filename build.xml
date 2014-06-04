@@ -82,18 +82,20 @@
 		<delete dir="${dist.dir}" />
 		<delete dir="${classes.dir}" />
 		<delete dir="${build.dir}" />
+		<delete file="${project.tarname}" />
+		<delete file="${project.build.jarfile}" />
 	</target>
 
 	<target name="docs">
 		<description>Generates public Javadocs documentation</description>
 		<delete dir="${javadocs.dir}" />
-		<javadoc sourcepath="${source.dir}" destdir="${docs.dir}" access="protected" />
+		<javadoc sourcepath="${source.dir}" destdir="${javadocs.dir}" access="protected" />
 	</target>
 
 	<target name="docs-private">
 		<description>Generates private Javadocs documentation</description>
 		<delete dir="${javadocs.dir}" />
-		<javadoc sourcepath="${source.dir}" destdir="${docs.dir}" access="private" />
+		<javadoc sourcepath="${source.dir}" destdir="${javadocs.dir}" access="private" />
 	</target>
 		
 </project>
