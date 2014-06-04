@@ -71,7 +71,13 @@
 	<target name="tarball" depends="dist">
 		<description>creates a distribution tarball and places it in the project root</description>
 		<tar destfile="${project.tarname}" compression="gzip">
-			<tarfileset dir="${dist.dir}" prefix="${project.package}-${project.version}" />
+			<tarfileset dir="${dist.dir}" prefix="${project.package}-${project.version}">
+				<include name="**" />
+				<exclude name="*.sh" />
+			</tarfileset>
+			<tarfileset dir="${dist.dir}" prefix="${project.package}-${project.version}" filemode="755">
+				<include name="*.sh" />
+			</tarfileset>
 		</tar>
 	</target>
 

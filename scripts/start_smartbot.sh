@@ -1,3 +1,3 @@
 #!/bin/bash
 
-java -jar smartbot.jar
+java -jar smartbot.jar "$@"
