@@ -61,6 +61,8 @@ public class SmartBot extends PircBot {
 	
 	private volatile boolean awaitingServerResponse = false;
 	
+	private String welcomeMsg;
+	
 	private String chan;
 	
 	private volatile boolean cleanDc = false;
@@ -201,6 +203,10 @@ public class SmartBot extends PircBot {
 			}
 		}, settings);
 		modules.put(module.getName().toUpperCase(), module);
+	}
+	
+	public void setStartupMessage(String msg) {
+		welcomeMsg = msg;
 	}
 	
 	/**
@@ -1166,6 +1172,9 @@ public class SmartBot extends PircBot {
 				attemptIdentify();
 			}
 			sendMessage(getIntendedChannel(), "Initialized - " + getVersion());
+			if (welcomeMsg != null && !welcomeMsg.equalsIgnoreCase("")) {
+				sendMessage(getIntendedChannel(), welcomeMsg);
+			}
 		}
 		for (final Module m : enabledModules.values()) {
 			if (m.onJoin(channel, sender, login, hostname)) {

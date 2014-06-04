@@ -417,6 +417,25 @@ public class CoreModule extends Module {
 				return "%s [module] <module...>";
 			}
 		});
+		addCommand("RELOAD", new BotAction() {
+			
+			@Override
+			public String syntax() {
+				return "%s";
+			}
+			
+			@Override
+			public String help() {
+				return "Kills this bot, executes reload hooks, and starts back up.";
+			}
+			
+			@Override
+			public void execute(String[] params, String sender, String recipient) {
+				if (bot.isAuthorized(sender)) {
+					System.exit(100);
+				}
+			}
+		});
 	}
 	
 }

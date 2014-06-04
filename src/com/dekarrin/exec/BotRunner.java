@@ -30,9 +30,13 @@ public class BotRunner {
 		if (firstTime) {
 			firstTimeSetup(bot);
 		}
+		String extraMsg = "";
 		for (String s : args) {
-			parseOption(s, bot);
+			if (!parseOption(s, bot)) {
+				extraMsg = s;
+			}
 		}
+		bot.setStartupMessage(extraMsg);
 		bot.enableModulesFromSettings();
 		bot.setVerbose(true);
 		try {
@@ -50,7 +54,7 @@ public class BotRunner {
 		}
 	}
 	
-	private static void parseOption(String opStr, SmartBot bot) {
+	private static boolean parseOption(String opStr, SmartBot bot) {
 		if (opStr.length() > 1 && opStr.charAt(0) == '-') {
 			if (opStr.charAt(1) == '-' && opStr.length() > 2) {
 				execLongOption(opStr.substring(2), bot);
@@ -59,6 +63,9 @@ public class BotRunner {
 					execOption(opStr.charAt(i), bot);
 				}
 			}
+			return true;
+		} else {
+			return false;
 		}
 	}
 	
