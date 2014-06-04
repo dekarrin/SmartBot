@@ -119,7 +119,7 @@ public class BotRunner {
 		System.out.println("Owner");
 		System.out.println("=====");
 		System.out.println("The owner is a bot operator that can never be de-oped.");
-		String owner = readString("Nick of bot owner");System.out.println();
+		String owner = readString("Nick of bot owner");
 		System.out.println();
 		System.out.println("Prepend Character");
 		System.out.println("=================");
@@ -133,6 +133,7 @@ public class BotRunner {
 		if (usePrepend) {
 			prependChar = readChar("Command prepend character", '%');
 		}
+		System.out.println();
 		System.out.println("Anti-Flood");
 		System.out.println("==========");
 		int msgDelay = readInt("Time in milliseconds between bot messages sent to server", 1000);
