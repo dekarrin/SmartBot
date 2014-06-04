@@ -107,7 +107,7 @@ public class BotRunner {
 		System.out.println("The bot nick is the nickname that SmartBot will identify itself as on the");
 		System.out.println("server.");
 		String nick = readString("Nick");
-		System.out.println("The real name is what SmartBot will use in resposne to a FINGER command.");
+		System.out.println("The real name is what SmartBot will use in response to a FINGER command.");
 		String finger = readString("Real name");
 		System.out.println("The local username is placed before the @ in the address shown in WHOIS");
 		System.out.println("output.");
