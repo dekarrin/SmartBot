@@ -79,9 +79,7 @@ public class SmartBot extends PircBot {
 	
 	private Map<String, Module> modules;
 	
-	// TODO: Highly insecure. We should not keep the nickserv password in
-	// memory.
-	private String nickPass = null;
+	private char[] nickPass = null;
 	
 	private volatile String oldNick = null;
 	
@@ -459,12 +457,17 @@ public class SmartBot extends PircBot {
 	 * 
 	 * @param pass What to use as the password.
 	 */
-	public void setNickServPass(final String pass) {
+	public void setNickServPass(final char[] pass) {
 		nickPass = pass;
-		if (pass != null && !pass.equals("")) {
+		if (pass != null && !(new String(pass)).equals("")) {
 			setTrustNickServ(true);
 		}
 		settings.setModuleSetting(CORE_MODULE_NAME, "nickserv_pass", pass);
+	}
+	
+	public void setBotMessageDelay(long ms) {
+		setMessageDelay(ms);
+		settings.setModuleSetting(CORE_MODULE_NAME, "message_delay", ms + "");
 	}
 	
 	public void setBotNick(final String nick) {
@@ -865,6 +868,9 @@ public class SmartBot extends PircBot {
 			// this is okay
 		} catch (final IOException e) {
 			e.printStackTrace();
+		} catch (final NullPointerException e) {
+			e.printStackTrace();
+			System.err.println("Error reading run control file!");
 		}
 		// assuming it didn't fail, set state from settings.
 		// DO NOT SET MODULE ENABLING; we don't know if all the modules have
@@ -882,19 +888,27 @@ public class SmartBot extends PircBot {
 			server = settings.getModuleSetting(CORE_MODULE_NAME, "server");
 			setFinger(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "finger"));
 			setLogin(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "login"));
-			setNickServPass(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "nickserv_pass"));
-			setChannel('#' + settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "channel"));
+			setNickServPass(settings.getModuleSettingChar(SmartBot.CORE_MODULE_NAME, "nickserv_pass"));
 			setBotNick(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "nick"));
+			setChannel('#' + settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "channel"));
 			setPrependChar(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "prepend_char").charAt(0));
 			setUsePrepend(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "use_prepend_char").equalsIgnoreCase("true"));
 			try {
+				setMessageDelay(Integer.parseInt(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "message_delay")));
+			} catch (NumberFormatException e) {
+				// do nothing
+				System.err.println("Warning: config value for message_delay is malformed. Defaulting to 1000");
+			}
+			try {
 				setTimeBetweenReconnects(Integer.parseInt(settings.getModuleSetting(SmartBot.CORE_MODULE_NAME, "time_between_reconnects")));
 			} catch (NumberFormatException e) {
+				System.err.println("Warning: config value for time_between_reconnects is malformed. Defaulting to 15");
 				setTimeBetweenReconnects(15);
 			}
 			try {
 				setReconnectionLimit(Integer.parseInt(settings.getModuleSetting(CORE_MODULE_NAME, "reconnection_limit")));
 			} catch (NumberFormatException e) {
+				System.err.println("Warning: config value for reconnection_limit is malformed. Defaulting to 3");
 				setReconnectionLimit(3);
 			}
 		}
@@ -984,7 +998,15 @@ public class SmartBot extends PircBot {
 			sendMessage("NickServ",
 					String.format("GHOST %s %s", loginNick, nickPass));
 		} else {
-			identify(nickPass);
+			setVerbose(false);
+			String pass = new String(nickPass);
+			identify(pass);
+			pass = null;
+			for (int i = 0; i < nickPass.length; i++) {
+				nickPass[i] = '\0';
+			}
+			nickPass = null;
+			setVerbose(true);
 			loggedIn = true;
 		}
 	}
@@ -1068,6 +1090,8 @@ public class SmartBot extends PircBot {
 					Thread.sleep(1000 * timeBetweenReconnects);
 					try {
 						reconnect();
+						settings.read();
+						nickPass = settings.getModuleSettingChar(CORE_MODULE_NAME, "nickserv_pass");
 						connected = true;
 					} catch (final Exception e) {
 						e.printStackTrace();
@@ -1232,7 +1256,15 @@ public class SmartBot extends PircBot {
 				&& oldNick.equalsIgnoreCase(this.oldNick)
 				&& newNick.equalsIgnoreCase(loginNick)) {
 			awaitingNickChange = loggingIn = false;
-			identify(nickPass);
+			setVerbose(false);
+			String pass = new String(nickPass);
+			identify(pass);
+			pass = null;
+			for (int i = 0; i < nickPass.length; i++) {
+				nickPass[i] = '\0';
+			}
+			nickPass = null;
+			setVerbose(true);
 			loggedIn = true;
 		}
 		for (final Module m : enabledModules.values()) {

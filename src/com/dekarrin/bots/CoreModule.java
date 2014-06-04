@@ -4,7 +4,7 @@ package com.dekarrin.bots;
 public class CoreModule extends Module {
 	
 	public CoreModule() {
-		super(SmartBot.CORE_MODULE_NAME, "v0.5", "Built-in bot commands");
+		super(SmartBot.CORE_MODULE_NAME, "v0.5.1", "Built-in bot commands");
 		addCommand("KILL", new BotAction() {
 			
 			@Override

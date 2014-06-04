@@ -1,6 +1,7 @@
 package com.dekarrin.exec;
 
 import java.io.BufferedReader;
+import java.io.Console;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -11,6 +12,10 @@ import com.dekarrin.bots.*;
 public class BotRunner {
 	
 	public static void main(String[] args) {
+		if (System.console() == null) {
+			System.err.println("Error: Not connected to compatible console");
+			System.exit(1);
+		}
 		File rc = new File(System.getProperty("user.home"), ".acmbotrc");
 		boolean firstTime = !rc.exists();
 		SmartBot bot = new SmartBot(rc.getAbsolutePath(),
@@ -86,56 +91,100 @@ public class BotRunner {
 		System.out.println("-c, --console   Start with interactive command console");
 	}
 	
+	// returns sha-256 hash of password
 	private static void firstTimeSetup(SmartBot bot) {
+		Console console = System.console();
 		System.out.println("It looks like this is the first time you've run SmartBot on this system.");
 		System.out.println("Let's go ahead and set up your bot!");
 		System.out.println();
-		System.out.println("Bot Location");
-		bot.setServer(readString("Server"));
-		bot.setChannel('#' + readString("Channel").replaceAll("#", ""));
+		System.out.println("Location");
+		System.out.println("========");
+		String server = readString("Server");
+		String channel = '#' + readString("Channel").replaceAll("#", "");
 		System.out.println();
-		System.out.println("Bot Identity");
-		bot.setBotNick(readString("Nick"));
-		bot.setBotFinger(readString("Finger"));
-		bot.setBotLogin(readString("Login"));
-		bot.setNickServPass(readString("NickServ pass (blank for untrusted NickServ)"));
+		System.out.println("Identity");
+		System.out.println("========");
+		System.out.println("The bot nick is the nickname that SmartBot will identify itself as on the");
+		System.out.println("server.");
+		String nick = readString("Nick");
+		System.out.println("The real name is what SmartBot will use in resposne to a FINGER command.");
+		String finger = readString("Real name");
+		System.out.println("The local username is placed before the @ in the address shown in WHOIS");
+		System.out.println("output.");
+		String login = readString("Local username");
+		System.out.println("Some networks allow nick authentication with NickServ. If you are joining");
+		System.out.println("such a network, you may enter a password now.");
+		char[] pass = console.readPassword("NickServ pass (blank for untrusted/unused NickServ): ");
 		System.out.println();
-		System.out.println("Misc.");
-		bot.setPrependChar(readChar("Command prepend char"));
-		bot.setUsePrepend(true);
-		bot.setReconnectionLimit(readInt("Max reconnection attempts"));
-		bot.setTimeBetweenReconnects(readInt("Time between reconnections"));
-		bot.setOwner(readString("Nick of bot owner"));
+		System.out.println("Owner");
+		System.out.println("=====");
+		System.out.println("The owner is a bot operator that can never be de-oped.");
+		String owner = readString("Nick of bot owner");System.out.println();
 		System.out.println();
+		System.out.println("Prepend Character");
+		System.out.println("=================");
+		System.out.println("The prepend character is a special character that SmartBot can listen for.");
+		System.out.println("If any message in the channel that SmartBot is in starts with that character,");
+		System.out.println("the remainder of the message will be interpreted as a command.");
+		System.out.println("Without using a prepend character, all commands will have to be sent to");
+		System.out.println("SmartBot by private message.");
+		boolean usePrepend = readBoolean("Use prepend character?", true);
+		char prependChar = '%';
+		if (usePrepend) {
+			prependChar = readChar("Command prepend character", '%');
+		}
+		System.out.println("Anti-Flood");
+		System.out.println("==========");
+		int msgDelay = readInt("Time in milliseconds between bot messages sent to server", 1000);
+		int reconLimit = readInt("Max reconnection attempts", 3);
+		int reconTime = readInt("Time in seconds between reconnections", 15);
+		System.out.println();
+		bot.setServer(server);
+		bot.setChannel(channel);
+		bot.setBotNick(nick);
+		bot.setBotFinger(finger);
+		bot.setBotLogin(login);
+		bot.setNickServPass(pass);
+		bot.setBotMessageDelay(msgDelay);
+		bot.setReconnectionLimit(reconLimit);
+		bot.setTimeBetweenReconnects(reconTime);
+		bot.setUsePrepend(usePrepend);
+		bot.setPrependChar(prependChar);
+		bot.setOwner(owner);
 		System.out.println("Setup complete!");
 		System.out.println("Settings are saved in the file .acmbotrc in your home directory.");
 		readString("(press enter to continue)");
 	}
 	
-	private static char readChar(String prompt) {
+	private static char readChar(String prompt, char defaultChar) {
 		char val = '\0';
 		boolean set = false;
 		while (!set) {
-			String str = readString(prompt);
+			String str = readString(prompt + " (default '" + defaultChar + "')");
 			if (str.length() < 1) {
-				System.err.println("You must enter a character!");
+				val = defaultChar;
 			} else {
 				val = str.charAt(0);
-				set = true;
 			}
+			set = true;
 		}
 		return val;
 	}
 	
-	private static int readInt(String prompt) {
+	private static int readInt(String prompt, int defaultInt) {
 		int val = 0;
 		boolean set = false;
 		while (!set) {
 			try {
-				val = Integer.parseInt(readString(prompt));
+				String s = readString(prompt + " (default " + defaultInt + ")");
+				if (s.equals("")) {
+					val = defaultInt;
+				} else {
+					val = Integer.parseInt(s);
+				}
 				set = true;
 			} catch (NumberFormatException e) {
-				System.err.println("You must enter an integer!");
+				System.err.println("Please enter an integer");
 			}
 		}
 		return val;
@@ -151,6 +200,29 @@ public class BotRunner {
 			e.printStackTrace();
 		}
 		return read;
+	}
+	
+	private static boolean readBoolean(String prompt, boolean defaultVal) {
+		boolean val = false;
+		boolean set = false;
+		while (!set) {
+			String s = readString(prompt + " (T/F) (default " + (defaultVal ? "T" : "F") + ")");
+			if (s.length() > 0) {
+				if (s.charAt(0) == 't' || s.charAt(0) == 'T') {
+					val = true;
+					set = true;
+				} else if (s.charAt(0) == 'f' || s.charAt(0) == 'F') {
+					val = false;
+					set = true;
+				} else {
+					System.err.println("Please enter T or F");
+				}
+			} else {
+				val = defaultVal;
+				set = true;
+			}
+		}
+		return val;
 	}
 	
 }

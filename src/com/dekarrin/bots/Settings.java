@@ -104,6 +104,10 @@ class Settings {
 		}
 	}
 	
+	public char[] getModuleSettingChar(final String mod, final String setting) {
+		return getModuleSetting(mod, setting).toCharArray();
+	}
+	
 	/**
 	 * Gets the set of operators for the bot. The returned set is immutable;
 	 * attempting to modify will result in an exception being thrown.
@@ -191,6 +195,11 @@ class Settings {
 		}
 	}
 	
+	public void setModuleSetting(final String mod, final String setting, final char[] value) {
+		// TODO: insecure. We should not be holding the password in memory
+		setModuleSetting(mod, setting, new String(value));
+	}
+	
 	/**
 	 * Sets whether a nick has operator status. If it does, it is added to the
 	 * set of operators; if it does not, it is removed from the set.
@@ -246,7 +255,7 @@ class Settings {
 			section = ReadMode.MODULES;
 		} else if (header.toUpperCase().equalsIgnoreCase("CORE")) {
 			section = ReadMode.CORE;
-			currentModuleSettings = new HashMap<String, String>();
+			currentModuleSettings = new LinkedHashMap<String, String>();
 			moduleSettings
 					.put(SmartBot.CORE_MODULE_NAME, currentModuleSettings);
 		} else if (header.toUpperCase().startsWith("MODULESETTINGS")) {
