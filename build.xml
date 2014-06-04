@@ -1,0 +1,101 @@
+<project name="SmartBot" default="build" basedir=".">
+
+	<!-- DO NOT CHANGE ANY OF THESE TO . OR ant clean WILL RM THE PROJECT! -->
+	<!-- If you change the dirs, be sure to update .gitignore -->
+	<property name="source.dir" location="src" />
+	<property name="build.dir" location="bin" />
+	<property name="classes.dir" location="${build.dir}" />
+	<property name="lib.dir" location="lib" />
+	<property name="dist.dir" location="dist" />
+	<property name="dist.lib.dir" location="${dist.dir}/lib" />
+	<property name="javadocs.dir" location="docs" />
+
+	<property file="build.properties" />
+
+	<property name="project.tarname" value="${project.package}-${project.version}.tar.gz" />
+	<property name="project.jarname" value="${project.package}.jar" />
+	<property name="project.license" location="LICENSE.txt" />
+	<property name="project.readme" location="README.md" />
+
+	<property name="dist.lib.pircbot" value="${dist.lib.dir}/pircbot/pircbot.jar" />
+
+	<property name="project.build.jarfile" location="${project.jarname}" />
+	<property name="project.dist.jarfile" location="${dist.dir}/${project.jarname}" />
+
+	<path id="project.class.path">
+		<pathelement path="${java.class.path}" />
+		<fileset dir="${lib.dir}">
+			<include name="**/*.jar" />
+		</fileset>
+	</path>
+
+	<available property="pircbot.availiable" classname="org.jibble.pircbot.PircBot" classpathref="project.class.path" />
+
+	<target name="build" depends="libcheck">
+		<mkdir dir="${classes.dir}" />
+		<description>Builds the project</description>
+		<javac srcdir="${source.dir}" destdir="${classes.dir}" classpathref="class.path" />
+	</target>
+
+	<target name="jar" depends="build">
+		<description>Packages classes into JAR file</description>
+		<jar destfile="${project.build.jarfile}">
+			<fileset dir="${classes.dir}" />
+			<manifest>
+				<attribute name="Main-Class" value="${project.mainclass}" />
+			</manifest>
+		</jar>
+	</target>
+
+	<target name="dist" depends="jar">
+		<description>Combines all project classes and source files into a single JAR and puts the result into the dist folder, along with any scripts and libraries needed to run PircBot</description>
+		<mkdir dir="${dist.dir}" />
+		<jar destfile="${project.dist.jarfile}">
+			<fileset dir="${source.dir}" includes="**/*.java" />
+			<zipfileset src="${project.build.jarfile}" includes="**/*.class" />
+			<manifest>
+				<attribute name="Main-Class" value="${project.mainclass}" />
+				<attribute name="Class-Path" value="${dist.lib.pircbot}" />
+			</manifest>
+		</jar>
+		<copy file="${lib.dir}" tofile="${dist.lib.dir}" />
+		<copy file="${project.license}" todir="${dist.dir}" />
+		<copy file="${project.readme}" todir="${dist.dir}" />
+		<copy todir="${dist.dir}">
+			<fileset dir="${scripts.dir}" />
+		</copy>
+	</target>
+
+	<target name="tarball" depends="dist">
+		<description>creates a distribution tarball and places it in the project root</description>
+		<tar destfile="${project.tarname}" includes="${dist.dir}/*" compression="gzip" />
+	</target>
+
+	<target name="clean">
+		<description>Removes all build files</description>
+		<delete dir="${javadocs.dir}" />
+		<delete dir="${dist.lib.dir}" />
+		<delete dir="${dist.dir}" />
+		<delete dir="${classes.dir}" />
+		<delete dir="${build.dir}" />
+	</target>
+
+	<target name="docs">
+		<description>Generates public Javadocs documentation</description>
+		<delete dir="${javadocs.dir}" />
+		<javadoc sourcepath="${source.dir}" destdir="${docs.dir}" access="protected" />
+	</target>
+
+	<target name="docs-private">
+		<description>Generates private Javadocs documentation</description>
+		<delete dir="${javadocs.dir}" />
+		<javadoc sourcepath="${source.dir}" destdir="${docs.dir}" access="private" />
+	</target>
+		
+		
+	<target name="libcheck">
+		<fail unless="pircbot.available" message="PircBot classes are not on the classpath!" />
+	</target>
+	
+
+</project>
