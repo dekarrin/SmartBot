@@ -5,5 +5,6 @@ dist/
 docs/
 
 *.tar
+*.tar.gz
 *.swp
 *.jar

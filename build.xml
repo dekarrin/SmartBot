@@ -8,9 +8,10 @@
 	<property name="lib.dir" location="lib" />
 	<property name="dist.dir" location="dist" />
 	<property name="dist.lib.dir" location="${dist.dir}/lib" />
+	<property name="scripts.dir" location="scripts" />
 	<property name="javadocs.dir" location="docs" />
 
-	<property file="build.properties" />
+	<property file="package.properties" />
 
 	<property name="project.tarname" value="${project.package}-${project.version}.tar.gz" />
 	<property name="project.jarname" value="${project.package}.jar" />
@@ -29,12 +30,10 @@
 		</fileset>
 	</path>
 
-	<available property="pircbot.availiable" classname="org.jibble.pircbot.PircBot" classpathref="project.class.path" />
-
-	<target name="build" depends="libcheck">
+	<target name="build">
 		<mkdir dir="${classes.dir}" />
 		<description>Builds the project</description>
-		<javac srcdir="${source.dir}" destdir="${classes.dir}" classpathref="class.path" />
+		<javac srcdir="${source.dir}" destdir="${classes.dir}" classpathref="project.class.path" includeantruntime="false" />
 	</target>
 
 	<target name="jar" depends="build">
@@ -58,7 +57,10 @@
 				<attribute name="Class-Path" value="${dist.lib.pircbot}" />
 			</manifest>
 		</jar>
-		<copy file="${lib.dir}" tofile="${dist.lib.dir}" />
+		<mkdir dir="${dist.lib.dir}" />
+		<copy todir="${dist.lib.dir}">
+			<fileset dir="${lib.dir}" />
+		</copy>
 		<copy file="${project.license}" todir="${dist.dir}" />
 		<copy file="${project.readme}" todir="${dist.dir}" />
 		<copy todir="${dist.dir}">
@@ -68,7 +70,9 @@
 
 	<target name="tarball" depends="dist">
 		<description>creates a distribution tarball and places it in the project root</description>
-		<tar destfile="${project.tarname}" includes="${dist.dir}/*" compression="gzip" />
+		<tar destfile="${project.tarname}" compression="gzip">
+			<tarfileset dir="${dist.dir}" prefix="${project.package}-${project.version}" />
+		</tar>
 	</target>
 
 	<target name="clean">
@@ -92,10 +96,4 @@
 		<javadoc sourcepath="${source.dir}" destdir="${docs.dir}" access="private" />
 	</target>
 		
-		
-	<target name="libcheck">
-		<fail unless="pircbot.available" message="PircBot classes are not on the classpath!" />
-	</target>
-	
-
 </project>
