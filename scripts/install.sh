@@ -74,6 +74,7 @@ check_install ()
 
 SCRIPT_DIRNAME="$(whereami)"
 VAR_SCRIPT="environment.sh"
+INST_PACKAGE_VERSION="@VERSION@"
 
 if [ -z "$RUNNING_SMARTBOT" ]
 then
@@ -90,41 +91,54 @@ then
 	echo "with no automatic integration."
 	if [ "$progs_found" = 3 ]
 	then
-		reload_enabled=$(confirm "Enable automatic integration on RELOAD?" "1")
+		integration_enabled=$(confirm "Enable automatic integration on RELOAD?" "1")
 		local_repo=$(read_required "Absolute path to local clone of repository")
 	else
 		echo "Could not find dependencies. RELOAD command will not cause automatic change integration."
-		reload_enabled=
+		integration_enabled=
 		local_repo=
 
 	if [ "$inst_prefix" != "$SCRIPT_DIRNAME" ]
 	then
-		package_install_path="$inst_prefix"
+		SMARTBOT_package_install_path="$inst_prefix"
 		mkdir -p "$inst_prefix"
 		cp -R "$SCRIPT_DIRNAME/*" "$inst_prefix"
 	else
-		package_install_path="$SCRIPT_DIRNAME"
+		SMARTBOT_package_install_path="$SCRIPT_DIRNAME"
 	fi
 
-	package_version="@VERSION@"
-	bin_dir="bin_$package_version"
+	bin_dir="bin_$INST_PACKAGE_VERSION"
 
 	cd "$SMARTBOT_package_install_path"
 	mkdir "$bin_dir"
 	mv * "$bin_dir"
 	mv "$bin_dir/run_smartbot.sh" .
 
-	sed -i -e "s/__PACKAGE_INSTALL_PATH__/$PACKAGE_INSTALL_PATH/" run_smartbot.sh
+	sed -i -e "s/__PACKAGE_INSTALL_PATH__/$SMARTBOT_package_install_path/" run_smartbot.sh
 
 	## Now make the script to set up our system variables
 	echo >> "$VAR_SCRIPT" <<EOF
 #!/bin/bash
 
-export package_version="$package_version"
-export reload_enabled="$reload_enabled"
-export local_repo="$local_repo"
+export SMARTBOT_package_version="$package_version"
+export SMARTBOT_integration_enabled="$integration_enabled"
+export SMARTBOT_local_repo="$local_repo"
 EOF
 
 else
-	
+	bin_dir="$1"
+	cd "$bin_dir/.."
+	rm -rf "$bin_dir"
+	bin_dir="bin_$INST_PACKAGE_VERSION"
+	mkdir "$bin_dir"
+	cp -R "$SCRIPT_DIRNAME/*" "$bin_dir"
+	msg=
+	if [ -n "$(diff "$SMARTBOT_package_install_path/run_smartbot.sh" "$bin_dir/run_smartbot.sh")" ]
+	then
+		rm -rf "$bin_dir/run_smartbot.sh"
+	else
+		msg="Notice: run_smartbot.sh cannot be automatically updated"
+	fi
+	sed -i -e 's/SMARTBOT_package_version=.*/SMARTBOT_package_version="'"$INST_PACKAGE_VERSION"'"/' "$VAR_SCRIPT"
+	echo $msg
 fi
