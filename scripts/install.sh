@@ -86,9 +86,9 @@ then
 	{ [ -n "$(javac -version 2>&1)" ] && progs_found=$(expr $progs_found + 1); } || echo "Warning: couldn't find sufficient JDK"
 
 	inst_prefix=$(read_default "Installation prefix" $SCRIPT_DIRNAME)
-	echo "Proper functionality for the SmartBot command RELOAD depends on git, ant, and the JDK."
-	echo "Without this functionality, RELOAD will simply cause restart_hook.sh to be executed,"
-	echo "with no automatic integration."
+	echo "Proper functionality for the SmartBot command RELOAD depends on git, ant, and"
+	echo "the JDK. Without this functionality, RELOAD will simply cause restart_hook.sh"
+	echo "to be executed, with no automatic integration."
 	if [ "$progs_found" = 3 ]
 	then
 		integration_enabled=$(confirm "Enable automatic integration on RELOAD?" "1")
@@ -108,7 +108,7 @@ then
 	then
 		SMARTBOT_package_install_path="$inst_prefix"
 		mkdir -p "$inst_prefix"
-		cp -R "$SCRIPT_DIRNAME/*" "$inst_prefix"
+		cp -R "$SCRIPT_DIRNAME"/* "$inst_prefix"
 	else
 		SMARTBOT_package_install_path="$SCRIPT_DIRNAME"
 	fi
@@ -135,13 +135,18 @@ then
 	echo "export SMARTBOT_package_version=\"$INST_PACKAGE_VERSION\"" >> "$VAR_SCRIPT"
 	echo "export SMARTBOT_integration_enabled=\"$integration_enabled\"" >> "$VAR_SCRIPT"
 	echo "export SMARTBOT_local_repo=\"$local_repo\"" >> "$VAR_SCRIPT"
+	echo
+	echo "Setup complete. Execute with the following script to get automatic change"
+	echo "integration functionality:"
+	echo
+	echo "\`$SMARTBOT_package_install_path/run_smartbot.sh'"
 else
 	bin_dir="$1"
 	cd "$bin_dir/.."
 	rm -rf "$bin_dir"
 	bin_dir="bin_$INST_PACKAGE_VERSION"
 	mkdir "$bin_dir"
-	cp -R "$SCRIPT_DIRNAME/*" "$bin_dir"
+	cp -R "$SCRIPT_DIRNAME"/* "$bin_dir"
 	msg=
 	if [ -n "$(diff "$SMARTBOT_package_install_path/run_smartbot.sh" "$bin_dir/run_smartbot.sh")" ]
 	then

@@ -25,6 +25,8 @@ do
 	cd "$bin_dir"
 	java -jar smartbot.jar "$extra_msg" "$@"
 	botstatus=$?
+	echo "Bot exited with status $botstatus"
+	echo
 	cd ..
 	extra_msg=
 	if [ "$botstatus" = 100 ]
@@ -32,7 +34,7 @@ do
 		if [ -f restart_hook.sh ]
 		then	
 			./restart_hook.sh
-			extra_msg="Restart hook: status $?"
+			extra_msg="Restart hook: status $?, "
 		fi
 		if [ -n "$SMARTBOT_integration_enabled" ]
 		then
@@ -46,12 +48,12 @@ do
 			cd "$SMARTBOT_package_install_path"
 			if [ -n "$success" ]
 			then
-				chmod 755 "$SMARTBOT_local_repo/dist/*.sh"
-				extra_msg="$extra_msg, $("$SMARTBOT_local_repo/dist/install.sh" "$bin_dir")"
+				chmod 755 "$SMARTBOT_local_repo/dist"/*.sh
+				extra_msg="${extra_msg}$("$SMARTBOT_local_repo/dist/install.sh" "$bin_dir")"
 				. "$SCRIPT_DIRNAME/environment.sh"
 				bin_dir="$SMARTBOT_package_install_path/bin_$SMARTBOT_package_version"
 			else
-				extra_msg="$extra_msg, Warning: could not integrate changes"
+				extra_msg="${extra_msg}Warning: could not integrate changes"
 			fi	
 		fi
 	else
