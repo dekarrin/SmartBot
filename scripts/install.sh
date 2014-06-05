@@ -54,11 +54,11 @@ confirm ()
 				;;
 	
 			*)
-				echo "Please enter Y or N"
 				;;
 		esac
 		[ -n "$val_set" ] && break
 	done
+	echo $val
 }
 
 # ensures that we are in a distribution environment
@@ -78,12 +78,12 @@ INST_PACKAGE_VERSION="@VERSION@"
 
 if [ -z "$RUNNING_SMARTBOT" ]
 then
-	export progs_found=0
+	progs_found=0
 	check_install || { echo "Script not in distribution environment. Exiting." && exit 1; }
 
-	{ [ -n "$(git --version)" ] && progs_found=$(expr $progs_found++) } || echo "Warning: couldn't find git installation"
-	{ [ -n "$(ant -version)" ] && progs_found=$(expr $progs_found++) } || echo "Warning: couldn't find Apache Ant installation"
-	{ [ -n "$(javac -version)" ] && progs_found=$(expr $progs_found++) } || echo "Warning: couldn't find sufficient JDK"
+	{ [ -n "$(git --version 2>&1)" ] && progs_found=$(expr $progs_found + 1); } || echo "Warning: couldn't find git installation"
+	{ [ -n "$(ant -version 2>&1)" ] && progs_found=$(expr $progs_found + 1); } || echo "Warning: couldn't find Apache Ant installation"
+	{ [ -n "$(javac -version 2>&1)" ] && progs_found=$(expr $progs_found + 1); } || echo "Warning: couldn't find sufficient JDK"
 
 	inst_prefix=$(read_default "Installation prefix" $SCRIPT_DIRNAME)
 	echo "Proper functionality for the SmartBot command RELOAD depends on git, ant, and the JDK."
@@ -92,11 +92,17 @@ then
 	if [ "$progs_found" = 3 ]
 	then
 		integration_enabled=$(confirm "Enable automatic integration on RELOAD?" "1")
-		local_repo=$(read_required "Absolute path to local clone of repository")
+		if [ -n "$integration_enabled" ]
+		then
+			local_repo=$(read_required "Absolute path to local clone of repository")
+		else
+			local_repo=
+		fi
 	else
 		echo "Could not find dependencies. RELOAD command will not cause automatic change integration."
 		integration_enabled=
 		local_repo=
+	fi
 
 	if [ "$inst_prefix" != "$SCRIPT_DIRNAME" ]
 	then
@@ -111,20 +117,24 @@ then
 
 	cd "$SMARTBOT_package_install_path"
 	mkdir "$bin_dir"
-	mv * "$bin_dir"
+	for f in *
+	do
+		if [ "$f" != "$bin_dir" ]
+		then
+			mv "$f" "$bin_dir"
+		fi
+	done
 	mv "$bin_dir/run_smartbot.sh" .
+	chmod 755 "run_smartbot.sh"
 
-	sed -i -e "s/__PACKAGE_INSTALL_PATH__/$SMARTBOT_package_install_path/" run_smartbot.sh
+	sed -i -e "s:__PACKAGE_INSTALL_PATH__:$SMARTBOT_package_install_path:" run_smartbot.sh
 
 	## Now make the script to set up our system variables
-	echo >> "$VAR_SCRIPT" <<EOF
-#!/bin/bash
-
-export SMARTBOT_package_version="$package_version"
-export SMARTBOT_integration_enabled="$integration_enabled"
-export SMARTBOT_local_repo="$local_repo"
-EOF
-
+	echo "#!/bin/bash" > "$VAR_SCRIPT"
+	echo >> "$VAR_SCRIPT"
+	echo "export SMARTBOT_package_version=\"$INST_PACKAGE_VERSION\"" >> "$VAR_SCRIPT"
+	echo "export SMARTBOT_integration_enabled=\"$integration_enabled\"" >> "$VAR_SCRIPT"
+	echo "export SMARTBOT_local_repo=\"$local_repo\"" >> "$VAR_SCRIPT"
 else
 	bin_dir="$1"
 	cd "$bin_dir/.."
