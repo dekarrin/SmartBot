@@ -66,6 +66,7 @@
 		<copy todir="${dist.dir}">
 			<fileset dir="${scripts.dir}" />
 		</copy>
+		<replace file="${dist.dir}/install.sh" token="@VERSION@" value="${package.version}" />
 	</target>
 
 	<target name="tar" depends="dist">
@@ -79,10 +80,6 @@
 				<include name="*.sh" />
 			</tarfileset>
 		</tar>
-	</target>
-
-	<target name="install">
-		
 	</target>
 
 	<target name="clean">
