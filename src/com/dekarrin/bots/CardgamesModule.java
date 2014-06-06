@@ -4,14 +4,114 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class CardgamesModule extends Module {
 	
+	public static class Challenge {
+		public final String challenger;
+		public final String game;
+		public final long startTime;
+		public Challenge(String challenger, String game) {
+			this.startTime = System.currentTimeMillis();
+			this.challenger = challenger;
+			this.game = game;
+		}
+	}
+	
+	private Map<String, List<CardGame>> activeGames = new HashMap<String, List<CardGame>>();
+	
+	private Map<String, List<Challenge>> challenges = new ConcurrentHashMap<String, Challenge>();
+	
 	public CardgamesModule() {
-		super("CARDGAMES", "v0.1", "Challenge friends to card games!");
-		//addCommand("GOFISH", )
+		super("CARDGAMES", "v0.1", "Challenge friends to card games");
+		(new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				while (true) {
+					try {
+						Thread.sleep(1000);
+						synchronized (challenges) {
+							List<String>
+							for (String chr : challenges.keySet()) {
+								
+							}
+						}
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
+						break;
+					}
+				}
+			}
+			
+		}, "Challenge-Clean")).start();
+		addCommand("GOFISH-CHALLENGE", new BotAction() {
+			
+			@Override
+			public String syntax() {
+				return "%s [oppenent]";
+			}
+			
+			@Override
+			public String help() {
+				return "Challenge someone to Go Fish";
+			}
+			
+			@Override
+			public void execute(String[] params, String sender, String recipient) {
+				if (params.length >= 1) {
+					String challengerNick = bot.getRegisteredNick(sender);
+					String challengeeNick = bot.getRegisteredNick(params[0]);
+					if (challengerNick != null) {
+						if (challengeeNick != null) {
+							String registration = challengerNick + "_vs_" + challengeeNick;
+							GoFishGame g = getGoFish(registration);
+							if (g == null) {
+								bot.sendMessage(sender, "You've sent out your challenge!");
+								bot.sendMessage(params[0], "You've been challenged to Go Fish by " + sender + ". GOFISH-ACCEPT or GOFISH-REJECT to respond.");
+								bot.sendMessage(bot.getChannel(), sender + " has challenged " + params[0] + " to a game of Go Fish!");
+								synchronized (challenges) {
+									if (!challenges.containsKey(challengeeNick)) {
+										challenges.put(challengeeNick, new ArrayList<Challenge>());
+									}
+									List<Challenge> list = challenges.get(challengeeNick);
+									if (, new Challenge(challengerNick, GoFishGame.NAME));
+								}
+							} else {
+								bot.sendMessage(recipient, "You're already in a game with " + params[0] + ".");
+							}
+						} else {
+							bot.sendMessage(recipient, "Your opponent must be logged in with NickServ to be challenged.");
+						}
+					} else {
+						bot.sendMessage(recipient, "You must be logged in with NickServ to challenge oppenents.");
+					}
+				} else {
+					bot.sendBadSyntax(recipient, sender);
+				}
+			}
+		});
+	}
+	
+	private GoFishGame getGoFish(String registration) {
+		List<CardGame> games = activeGames.get(registration);
+		if (games != null) {
+			GoFishGame theGame = null;
+			for (CardGame game : games) {
+				if (game.getName().equals(GoFishGame.NAME)) {
+					theGame = (GoFishGame)game;
+					break;
+				}
+			}
+			return theGame;
+		} else {
+			return null;
+		}
 	}
 
 }
@@ -158,13 +258,37 @@ class FrenchDeck extends Deck<FrenchCard> {
 	
 }
 
-class GoFishGame {
+abstract class CardGame {
+	
+	private final long startTime;
+	
+	private final String name;
+	
+	public CardGame(String name) {
+		this.name = name;
+		this.startTime = System.currentTimeMillis();
+	}
+	
+	public String getName() {
+		return name;
+	}
+	
+	public long getStartTime() {
+		return startTime;
+	}
+}
+
+class GoFishGame extends CardGame {
+	
+	public static final String NAME = "Go Fish";
 	
 	public static class Player {
 		
 		public String name;
 		
 		public List<FrenchCard> hand = new ArrayList<FrenchCard>();
+		
+		public List<FrenchCard> lastGot = null;
 		
 		public Player(String name) {
 			this.name = name;
@@ -197,6 +321,13 @@ class GoFishGame {
 			}
 			return cardsOfRank;
 		}
+		
+		public void give(List<FrenchCard> cards) {
+			for (FrenchCard c : cards) {
+				hand.add(c);
+			}
+			lastGot = cards;
+		}
 	}
 	
 	private FrenchDeck deck = new FrenchDeck(52);
@@ -206,6 +337,7 @@ class GoFishGame {
 	private int turn;
 	
 	public GoFishGame(String player1, String player2) {
+		super(NAME);
 		players.add(new Player(player1));
 		players.add(new Player(player2));
 		deck.shuffle();
@@ -241,7 +373,11 @@ class GoFishGame {
 		Player active = getActivePlayer();
 		Player inactive = getInactivePlayer();
 		if (active.hasCard(card) && inactive.hasRank(card)) {
-			inactive.takeRank(c)
+			List<FrenchCard> cards = inactive.takeRank(card);
+			active.give(cards);
+			return true;
+		} else {
+			return false;
 		}
 	}
 }
