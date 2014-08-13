@@ -470,26 +470,26 @@ class FrenchDeck extends Deck<FrenchCard> {
 	
 }
 
-abstract class CardGame {
+abstract class CardGame<T extends Card> {
 	
 	private final GameData data;
 	
 	private final long startTime;
 	
-	private final Player challenger;
+	private final Player<T> challenger;
 	
-	private final List<Player> opponents;
+	private final List<Player<T>> opponents;
 	
-	protected final List<Player> players;
+	protected final List<Player<T>> players;
 	
 	private int turn;
 	
-	public CardGame(GameData data, Player challenger, Player[] opponents) {
+	public CardGame(GameData data, Player<T> challenger, Player<T>[] opponents) {
 		this.data = data;
 		this.startTime = System.currentTimeMillis();
 		this.challenger = challenger;
-		this.opponents = new ArrayList<Player>();
-		players = new ArrayList<Player>();
+		this.opponents = new ArrayList<Player<T>>();
+		players = new ArrayList<Player<T>>();
 		players.add(challenger);
 		for (int i = 0; i < opponents.length; i++) {
 			players.add(opponents[i]);
@@ -586,6 +586,11 @@ class Player<T extends Card> {
 		return hand.contains(card);
 	}
 	
+	/**
+	 * Checks if all of the given cards are in the player's hand.
+	 * @param cards
+	 * @return
+	 */
 	public boolean isInHand(List<T> cards) {
 		for (T card : cards) {
 			if (!isInHand(card)) {
@@ -619,9 +624,9 @@ class FrenchPlayer extends Player<FrenchCard> {
 		super(name);
 	}
 	
-	public boolean hasRank(T c) {
+	public boolean hasRank(FrenchCard c) {
 		boolean has = false;
-		for (T card : hand) {
+		for (FrenchCard card : hand) {
 			if (card.rank == c.rank) {
 				has = true;
 				break;
