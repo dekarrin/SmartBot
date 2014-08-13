@@ -374,7 +374,7 @@ abstract class Deck<T extends Card> {
 		return cards.size();
 	}
 	
-	public void deal(int count, int numHands) {
+	public List<List<T>> deal(int count, int numHands) {
 		List<List<T>> hands = new ArrayList<List<T>>();
 		for (int i = 0; i < numHands; i++) {
 			hands.add(new ArrayList<T>());
